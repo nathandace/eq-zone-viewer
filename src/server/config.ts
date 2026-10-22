@@ -21,6 +21,8 @@ export interface AppConfig {
   port: number;
   /** Open the default browser once the server is listening. */
   openBrowser: boolean;
+  /** `--import-spawns <dump.sql>`: import NPC spawn data and exit instead of serving. */
+  importSpawns?: string;
 }
 
 /** Directory that holds config.json and cache/: next to the executable in a release build, else the project root. */
@@ -121,13 +123,19 @@ export function resolveEqDir(explicit?: string): { eqDir?: string; source?: AppC
 
 export function loadConfig(): AppConfig {
   const args = userArgs();
+  let importSpawns: string | undefined;
+  const importAt = args.indexOf('--import-spawns');
+  if (importAt >= 0) {
+    importSpawns = args[importAt + 1] ? resolve(args[importAt + 1]) : '';
+    args.splice(importAt, 2);
+  }
   const flags = new Set(args.filter((a) => a.startsWith('--')));
   const positional = args.filter((a) => !a.startsWith('--'));
   const file = readConfigFile();
   const { eqDir, source } = resolveEqDir(positional[0]);
   const port = Number(process.env.PORT || file.port || 3080);
   const openBrowser = flags.has('--open') || (sea.isSea() && !flags.has('--no-open'));
-  return { eqDir, eqDirSource: source, port, openBrowser };
+  return { eqDir, eqDirSource: source, port, openBrowser, importSpawns };
 }
 
 /** Persist the EverQuest directory to config.json (keeping any other settings in it) so the choice survives restarts. */

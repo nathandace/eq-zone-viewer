@@ -34,6 +34,7 @@
         <label><input type="checkbox" id="opt-maplines" checked /> Map lines</label>
         <label><input type="checkbox" id="opt-maplabels" checked /> Map labels</label>
         <label><input type="checkbox" id="opt-sky" checked /> Sky dome</label>
+        <label><input type="checkbox" id="opt-npcs" checked /> NPCs (imported spawn data)</label>
         <label><input type="checkbox" id="opt-sound" checked /> Sounds &amp; music</label>
         <label>Volume <input type="range" id="opt-volume" min="0" max="100" value="60" /></label>
         <label>Daylight <input type="range" id="opt-ambient" min="0" max="100" value="85" /></label>
@@ -51,6 +52,12 @@
         <input id="poi-filter" type="search" placeholder="Filter points…" autocomplete="off" />
         <div id="poi-count" class="muted"></div>
         <ul id="poi-list"></ul>
+      </details>
+      <details id="npcs">
+        <summary>NPCs</summary>
+        <input id="npc-filter" type="search" placeholder="Filter NPCs…" autocomplete="off" />
+        <div id="npc-count" class="muted"></div>
+        <ul id="npc-list"></ul>
       </details>
       <details id="bookmarks">
         <summary>Bookmarks &amp; sharing</summary>

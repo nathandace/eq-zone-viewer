@@ -141,6 +141,23 @@ the game ships it (newer zones). The sound files are read from the `snd*.pfs` ar
 folder; nothing is copied. Browsers only start audio after you click or press a key in the page. Classic
 zones' music is MIDI (`.xmi`), which browsers cannot play, so it is skipped.
 
+### NPCs
+
+The game client has the character models but not where NPCs stand; that lives on the server. The
+EverQuest Emulator community's Project EQ database has the spawn tables, and the viewer can import them:
+
+1. Download a Project EQ database dump (a `.sql` file; unzip it if needed).
+2. Run `eq-zone-viewer.exe --import-spawns path\to\peq.sql` (release build) or
+   `node tools/import-spawns.ts path/to/peq.sql` (from source). It reads the `spawn2`, `spawnentry`
+   and `npc_types` tables once and writes one small JSON per zone into a `spawns` folder next to the
+   app. Nothing from the dump is distributed with the viewer.
+3. Reload a zone. Every spawn point gets a marker and a name/level label, the **NPCs** section lists them
+   (click to go there), and NPCs whose race the client has a model for are shown in their default pose,
+   built on the fly from the `*_chr.s3d` archives.
+
+Models are the stock race models without the NPC's own texture variant or equipment, and they do not
+animate yet. The **NPCs** checkbox in Settings hides them.
+
 ### Finding your way around the zone list
 
 The list is grouped by expansion (the groups collapse when you click their heading), with **Favourites**
@@ -196,8 +213,8 @@ Example: `http://localhost:3080/#zone=gfaydark&loc=-1200,500` drops you on the g
 
 Every zone archive in a current Live install (612 zones) and in a progression-era install (198 zones)
 builds and renders; a few dozen of them report textures that could not be found, which show up in the
-warnings box. Not supported (yet): character and NPC models, dynamic lights, particles, sounds and zone
-lines. If a zone fails to build or looks
+warnings box. Not supported (yet): character animation, NPC texture variants and equipment, particles,
+MIDI music, and the newer zones' `.eqg` character models. If a zone fails to build or looks
 wrong, please [open an issue](https://github.com/nathandace/eq-zone-viewer/issues) with the zone name,
 which client you have, and the error shown in the viewer.
 
@@ -243,11 +260,18 @@ Layout:
 - `src/server/scene.ts`, `gltf.ts`: the intermediate scene model and the GLB writer.
 - `src/server/textures.ts`: DDS and BMP decoders, PNG encoder.
 - `src/server/zones.ts`: zone discovery and long names.
-- `src/client/main.ts`: the three.js viewer, bundled to `public/bundle.js` by esbuild.
+- `src/server/maps.ts`, `sounds.ts`, `spawns.ts`, `characters.ts`: in-game map files, sound placements
+  and sound archives, the spawn importer, character models and race codes.
+- `src/server/build-worker.ts`: runs one zone build on a worker thread.
+- `src/client/main.ts`: the three.js viewer core (loading, materials, camera, walk mode), bundled to
+  `public/bundle.js` by esbuild. Feature modules hang off a small context (`context.ts`): `maps.ts`,
+  `minimap.ts`, `bookmarks.ts`, `lights.ts`, `sky.ts`, `picker.ts`, `gamepad.ts`, `sounds.ts`,
+  `npcs.ts`, `housekeeping.ts`, `expansions.ts`.
 - `tools/`: `survey.ts` (format census of an install), `inspect.ts` (parser checks),
   `build-all.ts` (builds every zone and reports failures), `shot.ts` (headless screenshots of the
-  running viewer through Chrome's DevTools protocol, with the page's console output), `release.ts`
-  (release build).
+  running viewer through Chrome's DevTools protocol, with the page's console output and an `--eval`
+  hook), `import-spawns.ts` (NPC spawn import), `release.ts` (release build).
+- `tests/`: unit tests (`npm test`).
 
 After changing a parser, bump `BUILD_VERSION` in `src/server/main.ts` (or delete `cache/`) so stale builds
 are not served, and run `npm run build-all` to make sure every zone still builds.

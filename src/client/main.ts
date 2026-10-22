@@ -12,6 +12,7 @@ import { initPicker } from './picker.ts';
 import { initGamepad } from './gamepad.ts';
 import { initHousekeeping } from './housekeeping.ts';
 import { initSounds } from './sounds.ts';
+import { initNpcs } from './npcs.ts';
 import { EXPANSION_ORDER, expansionOf } from './expansions.ts';
 
 // Fast raycasts against zone geometry (walk mode, "Go to /loc").
@@ -81,6 +82,7 @@ const opts = {
   sky: $<HTMLInputElement>('opt-sky'),
   sound: $<HTMLInputElement>('opt-sound'),
   volume: $<HTMLInputElement>('opt-volume'),
+  npcs: $<HTMLInputElement>('opt-npcs'),
   ambient: $<HTMLInputElement>('opt-ambient'),
   speed: $<HTMLInputElement>('opt-speed'),
   fov: $<HTMLInputElement>('opt-fov'),
@@ -404,7 +406,7 @@ function kindOf(o: THREE.Object3D | null): string | undefined {
 }
 
 // ---------- Remembered settings ----------
-const PREF_KEYS = ['objects', 'lit', 'fog', 'wireframe', 'cull', 'vcolor', 'ambient', 'fov', 'maplines', 'maplabels', 'sky', 'sound', 'volume'] as const;
+const PREF_KEYS = ['objects', 'lit', 'fog', 'wireframe', 'cull', 'vcolor', 'ambient', 'fov', 'maplines', 'maplabels', 'sky', 'sound', 'volume', 'npcs'] as const;
 function savePrefs(): void {
   try {
     const out: Record<string, string | boolean> = {};
@@ -549,7 +551,7 @@ function isCollidable(obj: THREE.Object3D): boolean {
   for (let o: THREE.Object3D | null = obj; o; o = o.parent) {
     if (!o.visible) return false;
     const k = o.userData?.eqKind;
-    if (k === 'water' || k === 'sky') return false;
+    if (k === 'water' || k === 'sky' || k === 'npc') return false;
   }
   return true;
 }
@@ -1259,6 +1261,7 @@ initSky(ctx);
 initPicker(ctx);
 initGamepad(ctx);
 initSounds(ctx);
+initNpcs(ctx);
 
 /** Small scripting surface for the console and for tools/shot.ts. */
 (window as any).eqViewer = {

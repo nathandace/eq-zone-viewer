@@ -259,7 +259,7 @@ export class S3dBuilder {
   }
 
   /** Build a merged mesh for an actor definition (0x14). */
-  private actorMesh(ctx: WldContext, actorFrag: Frag, name: string): SceneMesh | undefined {
+  actorMesh(ctx: WldContext, actorFrag: Frag, name: string): SceneMesh | undefined {
     const { wld } = ctx;
     const def = wld.actorDef(actorFrag);
     const merger = new MeshMerger(name);

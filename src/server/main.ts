@@ -12,6 +12,8 @@ import type { BuildFailure, BuildRequest, BuildResult } from './build-worker.ts'
 import { decodeTexture, encodePng, downsample } from './textures.ts';
 import { loadZoneMap } from './maps.ts';
 import { isSafeSoundName, loadZoneSounds, soundArchiveFor } from './sounds.ts';
+import { buildCharacterScene, modelCodeFor } from './characters.ts';
+import { importSpawns } from './spawns.ts';
 import { buildSkyScene } from './build-s3d.ts';
 import { buildGlb } from './gltf.ts';
 import { APP_DIR, CONFIG_PATH, candidateEqDirs, loadConfig, looksLikeEqDir, saveEqDir } from './config.ts';
@@ -310,6 +312,45 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
     return;
   }
+  if (path === '/api/spawns/index.json') {
+    const p = join(APP_DIR, 'spawns', 'index.json');
+    if (!existsSync(p)) sendJson(res, 404, { error: 'no spawn data imported; see README (tools/import-spawns.ts)' });
+    else send(res, 200, readFileSync(p), 'application/json; charset=utf-8');
+    return;
+  }
+  m = /^\/api\/zone\/([^/]+)\/spawns\.json$/.exec(path);
+  if (m) {
+    const p = join(APP_DIR, 'spawns', `${sanitize(m[1].toLowerCase())}.json`);
+    if (!existsSync(p)) sendJson(res, 404, { error: 'no spawn data for this zone' });
+    else send(res, 200, readFileSync(p), 'application/json; charset=utf-8');
+    return;
+  }
+  m = /^\/api\/zone\/([^/]+)\/npc-model\/(\d+)-(\d+)\.glb$/.exec(path);
+  if (m) {
+    const zone = m[1].toLowerCase();
+    const code = modelCodeFor(Number(m[2]), Number(m[3]));
+    if (!config.eqDir || !code) {
+      sendJson(res, 404, { error: 'no model for this race' });
+      return;
+    }
+    const modelPath = join(cacheDir, 'models', `${sanitize(zone)}_${code}.glb`);
+    try {
+      if (!existsSync(modelPath)) {
+        const scene = buildCharacterScene(config.eqDir, zone, code);
+        if (!scene) {
+          sendJson(res, 404, { error: `model ${code} not found in the character archives` });
+          return;
+        }
+        mkdirSync(dirname(modelPath), { recursive: true });
+        writeFileSync(modelPath, buildGlb(scene));
+      }
+      send(res, 200, readFileSync(modelPath), 'model/gltf-binary', { 'Cache-Control': 'public, max-age=86400' });
+    } catch (e: any) {
+      console.error(`[model] ${code} failed:`, e.message);
+      sendJson(res, 500, { error: `model build failed: ${e.message}` });
+    }
+    return;
+  }
   m = /^\/api\/zone\/([^/]+)\/sounds\.json$/.exec(path);
   if (m) {
     const name = m[1].toLowerCase();
@@ -394,6 +435,39 @@ function openBrowser(url: string): void {
 
 // ---------- startup ----------
 console.log(`EQ Zone Viewer ${VERSION}`);
+
+/** `--import-spawns <dump.sql>`: convert a Project EQ dump into spawns/<zone>.json next to the app, then exit. */
+async function runSpawnImport(dump: string): Promise<void> {
+  if (!dump || !existsSync(dump)) {
+    console.error(`Usage: --import-spawns <path to a Project EQ .sql dump>${dump ? ` (not found: ${dump})` : ''}`);
+    process.exit(2);
+  }
+  const outDir = join(APP_DIR, 'spawns');
+  mkdirSync(outDir, { recursive: true });
+  const t0 = Date.now();
+  const zonesOut = await importSpawns(dump, (msg) => console.log(`[import] ${msg}`));
+  const index: Record<string, number> = {};
+  for (const [name, data] of zonesOut) {
+    writeFileSync(join(outDir, `${sanitize(name)}.json`), JSON.stringify(data));
+    index[name] = data.spawns.length;
+  }
+  writeFileSync(join(outDir, 'index.json'), JSON.stringify({ importedAt: new Date().toISOString(), source: dump, zones: index }, null, 1));
+  console.log(`[import] wrote ${zonesOut.size} zone files to ${outDir} in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+}
+
+if (config.importSpawns !== undefined) {
+  runSpawnImport(config.importSpawns).then(
+    () => process.exit(0),
+    (e) => {
+      console.error(`[import] failed: ${e.message}`);
+      process.exit(1);
+    },
+  );
+} else {
+  startServer();
+}
+
+function startServer(): void {
 setEqDir(config.eqDir);
 if (config.eqDir) {
   console.log(`EverQuest dir: ${config.eqDir} (${config.eqDirSource})`);
@@ -435,3 +509,4 @@ function listen(port: number, retries: number): void {
 }
 
 listen(config.port, 10);
+}
