@@ -11,6 +11,7 @@ import { discoverZones, type ZoneInfo } from './zones.ts';
 import type { BuildFailure, BuildRequest, BuildResult } from './build-worker.ts';
 import { decodeTexture, encodePng, downsample } from './textures.ts';
 import { loadZoneMap } from './maps.ts';
+import { isSafeSoundName, loadZoneSounds, soundArchiveFor } from './sounds.ts';
 import { buildSkyScene } from './build-s3d.ts';
 import { buildGlb } from './gltf.ts';
 import { APP_DIR, CONFIG_PATH, candidateEqDirs, loadConfig, looksLikeEqDir, saveEqDir } from './config.ts';
@@ -307,6 +308,35 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       console.error('[sky] failed:', e.message);
       sendJson(res, 500, { error: `sky build failed: ${e.message}` });
     }
+    return;
+  }
+  m = /^\/api\/zone\/([^/]+)\/sounds\.json$/.exec(path);
+  if (m) {
+    const name = m[1].toLowerCase();
+    const sounds = config.eqDir && zoneByName.has(name) ? loadZoneSounds(config.eqDir, name) : null;
+    if (!sounds) sendJson(res, 404, { error: `no sound placements for ${name}` });
+    else sendJson(res, 200, sounds);
+    return;
+  }
+  m = /^\/api\/sound\/([^/]+)$/.exec(path);
+  if (m) {
+    const file = m[1].toLowerCase();
+    if (!config.eqDir || !isSafeSoundName(file)) {
+      sendJson(res, 404, { error: 'unknown sound' });
+      return;
+    }
+    let data: Buffer | undefined;
+    let type = 'audio/wav';
+    if (file.endsWith('.mp3')) {
+      const p = join(config.eqDir, file);
+      if (existsSync(p)) data = readFileSync(p);
+      type = 'audio/mpeg';
+    } else {
+      const archiveFile = soundArchiveFor(config.eqDir, file);
+      data = archiveFile ? openArchive(archiveFile)?.get(file) : undefined;
+    }
+    if (!data) sendJson(res, 404, { error: `sound ${file} not found` });
+    else send(res, 200, data, type, { 'Cache-Control': 'public, max-age=86400' });
     return;
   }
   m = /^\/api\/zone\/([^/]+)\/map\.json$/.exec(path);

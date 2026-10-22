@@ -46,6 +46,7 @@ const chrome = spawn(browser, [
   '--hide-scrollbars',
   '--no-first-run',
   '--disable-sync',
+  '--autoplay-policy=no-user-gesture-required',
   `--user-data-dir=${process.env.TEMP || '/tmp'}/eqzv-shot-${process.pid}`,
   'about:blank',
 ]);

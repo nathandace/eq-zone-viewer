@@ -132,6 +132,15 @@ Good's replace with much richer versions). The viewer draws them in the world:
   position and heading. Click it to teleport, use the mouse wheel over it to zoom in up to 8×. The
   **compass** above it shows north and the direction you face.
 
+### Sounds and music
+
+With **Sounds & music** on, the zone's own sound placements play: ambient loops (wind, water, crickets)
+with their day and night variants chosen by the Daylight slider, one-shot emitters such as birds and
+campfires that repeat on the game's cooldowns, all positioned in 3D around you, and MP3 zone music where
+the game ships it (newer zones). The sound files are read from the `snd*.pfs` archives and the game
+folder; nothing is copied. Browsers only start audio after you click or press a key in the page. Classic
+zones' music is MIDI (`.xmi`), which browsers cannot play, so it is skipped.
+
 ### Finding your way around the zone list
 
 The list is grouped by expansion (the groups collapse when you click their heading), with **Favourites**

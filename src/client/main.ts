@@ -11,6 +11,7 @@ import { initSky } from './sky.ts';
 import { initPicker } from './picker.ts';
 import { initGamepad } from './gamepad.ts';
 import { initHousekeeping } from './housekeeping.ts';
+import { initSounds } from './sounds.ts';
 import { EXPANSION_ORDER, expansionOf } from './expansions.ts';
 
 // Fast raycasts against zone geometry (walk mode, "Go to /loc").
@@ -78,6 +79,8 @@ const opts = {
   maplines: $<HTMLInputElement>('opt-maplines'),
   maplabels: $<HTMLInputElement>('opt-maplabels'),
   sky: $<HTMLInputElement>('opt-sky'),
+  sound: $<HTMLInputElement>('opt-sound'),
+  volume: $<HTMLInputElement>('opt-volume'),
   ambient: $<HTMLInputElement>('opt-ambient'),
   speed: $<HTMLInputElement>('opt-speed'),
   fov: $<HTMLInputElement>('opt-fov'),
@@ -401,7 +404,7 @@ function kindOf(o: THREE.Object3D | null): string | undefined {
 }
 
 // ---------- Remembered settings ----------
-const PREF_KEYS = ['objects', 'lit', 'fog', 'wireframe', 'cull', 'vcolor', 'ambient', 'fov', 'maplines', 'maplabels', 'sky'] as const;
+const PREF_KEYS = ['objects', 'lit', 'fog', 'wireframe', 'cull', 'vcolor', 'ambient', 'fov', 'maplines', 'maplabels', 'sky', 'sound', 'volume'] as const;
 function savePrefs(): void {
   try {
     const out: Record<string, string | boolean> = {};
@@ -1255,9 +1258,11 @@ initLights(ctx);
 initSky(ctx);
 initPicker(ctx);
 initGamepad(ctx);
+initSounds(ctx);
 
 /** Small scripting surface for the console and for tools/shot.ts. */
 (window as any).eqViewer = {
+  ...((window as any).eqViewer ?? {}),
   loadZone,
   zones: () => zones,
   camera,
