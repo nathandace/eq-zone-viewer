@@ -677,3 +677,107 @@ details summary {
 #warnings {
   max-height: 30%;
 }
+
+/* ---------- zone list groups, favourites ---------- */
+#zone-list li.group {
+  cursor: pointer;
+  color: var(--accent2);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 8px 12px 4px;
+  border-top: 1px solid var(--border);
+  justify-content: flex-start;
+  gap: 8px;
+  user-select: none;
+}
+
+#zone-list li.group .count {
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: auto;
+}
+
+#zone-list li .star {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px 0 0;
+  line-height: 1;
+}
+
+#zone-list li .star.on,
+#zone-list li .star:hover {
+  color: var(--accent2);
+}
+
+#zone-list li .long {
+  flex: 1 1 auto;
+}
+
+/* ---------- click-to-identify tooltip ---------- */
+#pick {
+  position: absolute;
+  max-width: 320px;
+  background: rgba(20, 22, 28, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 8;
+  line-height: 1.5;
+}
+
+#pick b {
+  color: var(--accent2);
+}
+
+/* ---------- texture browser ---------- */
+#tex-count {
+  font-size: 12px;
+  margin: 4px 0;
+}
+
+#tex-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+#tex-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  overflow: hidden;
+}
+
+#tex-list li:hover {
+  background: var(--panel2);
+}
+
+#tex-list img {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #000;
+  flex: 0 0 auto;
+}
+
+#tex-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

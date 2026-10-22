@@ -62,6 +62,11 @@
           <button id="btn-topdown" type="button" title="Save a 4096-pixel top-down map of the zone">Export map</button>
         </div>
       </details>
+      <details id="textures">
+        <summary>Textures</summary>
+        <div id="tex-count" class="muted"></div>
+        <ul id="tex-list"></ul>
+      </details>
       <details id="help">
         <summary>Controls</summary>
         <p>Drag in the view (left or right button) to look around.<br />
@@ -69,7 +74,8 @@
           <b>Shift</b> fast · <b>Ctrl</b> slow · <b>Mouse wheel</b> speed<br />
           <b>R</b> reset camera · <b>O</b> toggle objects · <b>T</b> top view<br />
           <b>G</b> walk mode (on foot, with gravity) · <b>Space</b> jump · <b>M</b> hide menu<br />
-          In water: <b>E / Space</b> swim up · <b>Q / C</b> dive</p>
+          In water: <b>E / Space</b> swim up · <b>Q / C</b> dive<br />
+          Gamepad: sticks move and look · <b>A</b> jump/up · <b>B</b> down · <b>Y</b> walk mode · <b>X</b> return to start</p>
       </details>
       <div id="about">
         <a href="https://github.com/nathandace/eq-zone-viewer" target="_blank" rel="noopener">EQ Zone Viewer on GitHub</a>
@@ -94,7 +100,8 @@
       <canvas id="minimap" width="400" height="400" title="Click to teleport · mouse wheel to zoom"></canvas>
     </div>
     <div id="warnings" class="hidden"></div>
-    <div id="hint" class="hidden">Drag to look around · W A S D to move · scroll wheel for speed</div>
+    <div id="hint" class="hidden">Drag to look around · W A S D to move · scroll wheel for speed · click to identify</div>
+    <div id="pick" class="hidden"></div>
     <div id="setup" class="hidden">
       <div class="panel">
         <h2>Where is EverQuest installed?</h2>

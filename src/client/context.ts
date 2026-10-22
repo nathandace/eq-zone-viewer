@@ -13,8 +13,8 @@ export interface ZoneBounds {
 }
 
 interface Handlers {
-  /** A zone finished loading and is in the scene (extras = glTF root extras: stats, bounds, start). */
-  zoneLoaded: (zone: ZoneInfo, extras: any) => void;
+  /** A zone finished loading and is in the scene (extras = glTF root extras: stats, bounds, start; json = the glTF document). */
+  zoneLoaded: (zone: ZoneInfo, extras: any, json?: any) => void;
   /** The current zone was removed from the scene. */
   zoneCleared: () => void;
   /** Once per animation frame, before the main render. */
@@ -62,6 +62,9 @@ export interface ViewerCtx {
   walking(): boolean;
   swimming(): boolean;
   setWalkMode(on: boolean): void;
+  returnToStart(): void;
+  /** Press or release a movement key on behalf of another input device (gamepad). */
+  holdKey(code: string, down: boolean): void;
   setStatus(s: string): void;
   /** Object layer used for screen-space labels (excluded from the top-down renders). */
   layers: { labels: number };

@@ -132,6 +132,24 @@ Good's replace with much richer versions). The viewer draws them in the world:
   position and heading. Click it to teleport, use the mouse wheel over it to zoom in up to 8×. The
   **compass** above it shows north and the direction you face.
 
+### Finding your way around the zone list
+
+The list is grouped by expansion (the groups collapse when you click their heading), with **Favourites**
+(the star next to a zone) and the eight most **Recent** zones at the top. Typing in the filter box
+searches across all zones by short or long name.
+
+### Identifying what you see
+
+A plain click in the view (as opposed to a drag) names what you hit: the object, its material and
+texture, the `/loc` of the point and its distance. The **Textures** section lists every texture of the
+loaded zone with a thumbnail; click one to open the full-size image.
+
+### Gamepad
+
+A standard-mapping gamepad works out of the box: left stick moves, right stick looks, **A** jumps or
+flies up, **B** goes down, the bumpers sprint and creep, **Y** toggles walk mode, **X** returns to the
+start and **Start** hides the menu.
+
 ### Bookmarks and sharing
 
 The **Bookmarks & sharing** section saves named camera positions per zone in your browser, copies a link

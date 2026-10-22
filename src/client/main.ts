@@ -8,6 +8,9 @@ import { initMinimap } from './minimap.ts';
 import { initBookmarks } from './bookmarks.ts';
 import { initLights } from './lights.ts';
 import { initSky } from './sky.ts';
+import { initPicker } from './picker.ts';
+import { initGamepad } from './gamepad.ts';
+import { EXPANSION_ORDER, expansionOf } from './expansions.ts';
 
 // Fast raycasts against zone geometry (walk mode, "Go to /loc").
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
@@ -88,30 +91,117 @@ async function loadZoneList(): Promise<void> {
   renderList();
 }
 
+// Favourites, recently visited zones and collapsed groups live in the browser.
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writeJson(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage unavailable */
+  }
+}
+let favourites = new Set<string>(readJson<string[]>('eqzv.favourites', []));
+let recents: string[] = readJson<string[]>('eqzv.recents', []);
+const collapsedGroups = new Set<string>(readJson<string[]>('eqzv.collapsedGroups', []));
+
+function toggleFavourite(name: string): void {
+  if (favourites.has(name)) favourites.delete(name);
+  else favourites.add(name);
+  writeJson('eqzv.favourites', [...favourites]);
+  renderList();
+}
+
+function noteRecent(name: string): void {
+  recents = [name, ...recents.filter((n) => n !== name)].slice(0, 8);
+  writeJson('eqzv.recents', recents);
+}
+
+function zoneItem(z: ZoneInfo): HTMLLIElement {
+  const li = document.createElement('li');
+  li.dataset.name = z.name;
+  if (currentZone?.name === z.name) li.classList.add('active');
+  const star = document.createElement('button');
+  star.type = 'button';
+  star.className = 'star' + (favourites.has(z.name) ? ' on' : '');
+  star.textContent = favourites.has(z.name) ? '★' : '☆';
+  star.title = favourites.has(z.name) ? 'Remove from favourites' : 'Add to favourites';
+  star.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleFavourite(z.name);
+  });
+  const left = document.createElement('span');
+  left.className = 'long';
+  left.textContent = z.longName;
+  const right = document.createElement('span');
+  right.className = 'short';
+  right.textContent = z.name;
+  const kind = document.createElement('span');
+  kind.className = 'kind';
+  kind.textContent = z.kind;
+  right.appendChild(kind);
+  li.append(star, left, right);
+  li.addEventListener('click', () => loadZone(z));
+  return li;
+}
+
+function groupHeader(title: string, count: number, key: string): HTMLLIElement {
+  const li = document.createElement('li');
+  li.className = 'group' + (collapsedGroups.has(key) ? ' collapsed' : '');
+  li.textContent = `${collapsedGroups.has(key) ? '▸' : '▾'} ${title}`;
+  const n = document.createElement('span');
+  n.className = 'count';
+  n.textContent = String(count);
+  li.appendChild(n);
+  li.addEventListener('click', () => {
+    if (collapsedGroups.has(key)) collapsedGroups.delete(key);
+    else collapsedGroups.add(key);
+    writeJson('eqzv.collapsedGroups', [...collapsedGroups]);
+    renderList();
+  });
+  return li;
+}
+
 function renderList(): void {
   const q = filterEl.value.trim().toLowerCase();
   listEl.innerHTML = '';
-  let n = 0;
-  for (const z of zones) {
-    if (q && !z.name.includes(q) && !z.longName.toLowerCase().includes(q)) continue;
-    n++;
-    const li = document.createElement('li');
-    li.dataset.name = z.name;
-    if (currentZone?.name === z.name) li.classList.add('active');
-    const left = document.createElement('span');
-    left.textContent = z.longName;
-    const right = document.createElement('span');
-    right.className = 'short';
-    right.textContent = z.name;
-    const kind = document.createElement('span');
-    kind.className = 'kind';
-    kind.textContent = z.kind;
-    right.appendChild(kind);
-    li.append(left, right);
-    li.addEventListener('click', () => loadZone(z));
-    listEl.appendChild(li);
+  const byName = new Map(zones.map((z) => [z.name, z]));
+  if (q) {
+    // Searching: a flat list of matches.
+    let n = 0;
+    for (const z of zones) {
+      if (!z.name.includes(q) && !z.longName.toLowerCase().includes(q)) continue;
+      n++;
+      listEl.appendChild(zoneItem(z));
+    }
+    $('zone-count').textContent = `${n} of ${zones.length} zones`;
+    return;
   }
-  $('zone-count').textContent = `${n} of ${zones.length} zones`;
+  const sections: [string, ZoneInfo[]][] = [];
+  const favs = [...favourites].map((n) => byName.get(n)).filter((z): z is ZoneInfo => !!z);
+  if (favs.length) sections.push(['Favourites', favs.sort((a, b) => a.longName.localeCompare(b.longName))]);
+  const rec = recents.map((n) => byName.get(n)).filter((z): z is ZoneInfo => !!z);
+  if (rec.length) sections.push(['Recent', rec]);
+  const groups = new Map<string, ZoneInfo[]>();
+  for (const z of zones) {
+    const g = expansionOf(z.name);
+    (groups.get(g) ?? groups.set(g, []).get(g)!).push(z);
+  }
+  const order = [...EXPANSION_ORDER, ...[...groups.keys()].filter((g) => !EXPANSION_ORDER.includes(g))];
+  for (const g of order) if (groups.has(g)) sections.push([g, groups.get(g)!]);
+  for (const [title, list] of sections) {
+    const key = title.toLowerCase();
+    listEl.appendChild(groupHeader(title, list.length, key));
+    if (collapsedGroups.has(key)) continue;
+    for (const z of list) listEl.appendChild(zoneItem(z));
+  }
+  $('zone-count').textContent = `${zones.length} zones`;
 }
 
 filterEl.addEventListener('input', renderList);
@@ -254,7 +344,9 @@ async function loadZone(z: ZoneInfo): Promise<void> {
     showWarnings(extras);
     hintEl.classList.remove('hidden');
     rememberLastZone(z.name);
-    events.emit('zoneLoaded', z, extras);
+    noteRecent(z.name);
+    renderList();
+    events.emit('zoneLoaded', z, extras, gltf.parser.json);
   } catch (e: any) {
     console.error(e);
     setProgress(-1);
@@ -1138,6 +1230,16 @@ const ctx: ViewerCtx = {
   walking: () => walk.enabled,
   swimming: () => walk.swimming,
   setWalkMode,
+  returnToStart,
+  holdKey: (code, down) => {
+    if (down) {
+      keys.add(code);
+      keyTimes.set(code, performance.now());
+    } else {
+      keys.delete(code);
+      keyTimes.delete(code);
+    }
+  },
   setStatus,
   layers: { labels: 1 },
   viewLink,
@@ -1147,6 +1249,8 @@ initMinimap(ctx);
 initBookmarks(ctx);
 initLights(ctx);
 initSky(ctx);
+initPicker(ctx);
+initGamepad(ctx);
 
 /** Small scripting surface for the console and for tools/shot.ts. */
 (window as any).eqViewer = {
