@@ -28,9 +28,9 @@ body {
 }
 
 #sidebar {
-  width: 340px;
-  flex: 0 0 340px;
-  font-size: 15px;
+  width: 380px;
+  flex: 0 0 380px;
+  font-size: 17px;
   background: var(--panel);
   border-right: 1px solid var(--border);
   display: flex;
@@ -41,11 +41,63 @@ body {
 #sidebar header {
   padding: 12px 12px 8px;
   border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+#btn-collapse {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#btn-collapse:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+#btn-menu {
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  z-index: 6;
+  display: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(29, 32, 38, 0.92);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+#btn-menu:hover {
+  border-color: var(--accent);
+}
+
+body.menu-collapsed #sidebar {
+  display: none;
+}
+
+body.menu-collapsed #btn-menu {
+  display: block;
+}
+
+body.menu-collapsed #hud {
+  top: 54px;
 }
 
 #sidebar h1 {
   margin: 0 0 8px;
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--accent2);
   letter-spacing: 0.02em;
@@ -53,8 +105,8 @@ body {
 
 #filter {
   width: 100%;
-  padding: 7px 9px;
-  font-size: 15px;
+  padding: 8px 10px;
+  font-size: 17px;
   border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--panel2);
@@ -68,7 +120,7 @@ body {
 
 #zone-count {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 #zone-list {
@@ -81,7 +133,7 @@ body {
 }
 
 #zone-list li {
-  padding: 7px 12px;
+  padding: 8px 12px;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
@@ -100,7 +152,7 @@ body {
 
 #zone-list li .short {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   font-family: ui-monospace, Consolas, monospace;
 }
 
@@ -109,7 +161,7 @@ body {
 }
 
 #zone-list li .kind {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   border: 1px solid var(--border);
   border-radius: 3px;
@@ -120,7 +172,7 @@ body {
 #sidebar footer {
   border-top: 1px solid var(--border);
   padding: 8px 12px;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 details summary {
@@ -150,7 +202,7 @@ details summary {
   border: 1px solid var(--border);
   background: var(--panel2);
   color: var(--text);
-  font-size: 13px;
+  font-size: 15px;
   min-width: 0;
 }
 
@@ -171,7 +223,7 @@ details summary {
   color: var(--text);
   text-decoration: none;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 #settings button:hover,
@@ -211,19 +263,24 @@ details summary {
   left: 12px;
   top: 10px;
   pointer-events: none;
-  text-shadow: 0 1px 2px #000;
+  background: rgba(20, 22, 28, 0.82);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  max-width: calc(100% - 24px);
 }
 
 #status {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
 }
 
 #stats {
   font-family: ui-monospace, Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px;
   white-space: pre;
   margin-top: 4px;
+  color: var(--text);
 }
 
 #warnings {
@@ -270,7 +327,7 @@ details summary {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   padding-bottom: 6px;
   margin-bottom: 4px;
   border-bottom: 1px solid var(--border);
@@ -439,4 +496,25 @@ details summary {
   background: var(--accent);
   border-color: var(--accent2);
   color: #1a1407;
+}
+
+/* ---------- about / GitHub link ---------- */
+#about {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#about a {
+  color: var(--accent2);
+  text-decoration: none;
+}
+
+#about a:hover {
+  text-decoration: underline;
 }

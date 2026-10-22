@@ -623,6 +623,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyR') returnToStart();
   if (e.code === 'KeyT') topView();
   if (e.code === 'KeyG') setWalkMode(!walk.enabled);
+  if (e.code === 'KeyM') setMenuCollapsed(!document.body.classList.contains('menu-collapsed'));
   if (e.code === 'KeyO') {
     opts.objects.checked = !opts.objects.checked;
     applyVisibility();
@@ -668,6 +669,23 @@ opts.fov.addEventListener('input', () => {
 $('btn-reset').addEventListener('click', returnToStart);
 $('btn-start').addEventListener('click', returnToStart);
 $('btn-walk').addEventListener('click', () => setWalkMode(!walk.enabled));
+
+// ---------- Collapsible menu ----------
+function setMenuCollapsed(on: boolean): void {
+  document.body.classList.toggle('menu-collapsed', on);
+  try {
+    localStorage.setItem('eqzv.menuCollapsed', on ? '1' : '0');
+  } catch {
+    /* private mode or storage disabled */
+  }
+}
+$('btn-collapse').addEventListener('click', () => setMenuCollapsed(true));
+$('btn-menu').addEventListener('click', () => setMenuCollapsed(false));
+try {
+  if (localStorage.getItem('eqzv.menuCollapsed') === '1') setMenuCollapsed(true);
+} catch {
+  /* ignore */
+}
 $('btn-top').addEventListener('click', topView);
 $<HTMLInputElement>('goto').addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
@@ -831,6 +849,7 @@ function bootFromHash(): void {
 fetchConfig()
   .then(async (cfg) => {
     showFolder(cfg);
+    $('version').textContent = cfg.version ? `v${cfg.version}` : '';
     if (cfg.ok) {
       await loadZoneList();
       bootFromHash();

@@ -10,6 +10,7 @@
   <aside id="sidebar">
     <header>
       <h1>EQ Zone Viewer</h1>
+      <button id="btn-collapse" type="button" title="Hide the menu (M)">&#9664; Hide</button>
       <input id="filter" type="search" placeholder="Filter zones…" autocomplete="off" />
       <div id="zone-count" class="muted"></div>
     </header>
@@ -45,12 +46,17 @@
           <b>W A S D</b> move · <b>Q / C</b> down · <b>E / Space</b> up<br />
           <b>Shift</b> fast · <b>Ctrl</b> slow · <b>Mouse wheel</b> speed<br />
           <b>R</b> reset camera · <b>O</b> toggle objects · <b>T</b> top view<br />
-          <b>G</b> walk mode (on foot, with gravity) · <b>Space</b> jump</p>
+          <b>G</b> walk mode (on foot, with gravity) · <b>Space</b> jump · <b>M</b> hide menu</p>
       </details>
+      <div id="about">
+        <a href="https://github.com/nathandace/eq-zone-viewer" target="_blank" rel="noopener">EQ Zone Viewer on GitHub</a>
+        <span id="version"></span>
+      </div>
     </footer>
   </aside>
   <main id="view">
     <canvas id="canvas" tabindex="-1"></canvas>
+    <button id="btn-menu" type="button" title="Show the menu (M)">&#9776; Menu</button>
     <div id="hud">
       <div id="status">Select a zone</div>
       <div id="stats" class="muted"></div>
