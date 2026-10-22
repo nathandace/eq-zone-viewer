@@ -10,6 +10,7 @@ import { PfsArchive } from './pfs.ts';
 import { discoverZones, type ZoneInfo } from './zones.ts';
 import type { BuildFailure, BuildRequest, BuildResult } from './build-worker.ts';
 import { decodeTexture, encodePng, downsample } from './textures.ts';
+import { loadZoneMap } from './maps.ts';
 import { APP_DIR, CONFIG_PATH, candidateEqDirs, loadConfig, looksLikeEqDir, saveEqDir } from './config.ts';
 
 /** Bump when the parsers or the GLB layout change so cached zone builds are discarded. */
@@ -259,6 +260,14 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       console.error(`[build] ${name} failed:`, e);
       sendJson(res, 500, { error: `build failed: ${e.message}`, stack: String(e.stack || '').split('\n').slice(0, 6) });
     }
+    return;
+  }
+  m = /^\/api\/zone\/([^/]+)\/map\.json$/.exec(path);
+  if (m) {
+    const name = m[1].toLowerCase();
+    const map = config.eqDir && zoneByName.has(name) ? loadZoneMap(config.eqDir, name, zones) : null;
+    if (!map) sendJson(res, 404, { error: `no map files for ${name}` });
+    else sendJson(res, 200, map);
     return;
   }
   m = /^\/api\/zone\/([^/]+)\/info\.json$/.exec(path);

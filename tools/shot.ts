@@ -1,6 +1,7 @@
 // Headless screenshot of the running viewer, driven over the Chrome DevTools protocol in real time.
-// Usage: node tools/shot.ts "<hash params>" out.png [--port 3081] [--width 1280] [--height 720] [--wait 1500] [--timeout 60000]
+// Usage: node tools/shot.ts "<hash params>" out.png [--port 3081] [--width 1280] [--height 720] [--wait 1500] [--timeout 60000] [--eval "<js>"]
 // Example: node tools/shot.ts "zone=gfaydark&walk=1" gfay.png --wait 2000
+//          node tools/shot.ts "zone=gfaydark" travel.png --eval "document.querySelector('#poi-list li.zoneline').click()" --wait 8000
 // Waits until the viewer reports the zone as loaded (window.eqViewer.state().loaded), then `--wait` ms more,
 // takes the screenshot, and prints the page's console messages. Exit code 1 if the zone never loads.
 import { spawn } from 'node:child_process';
@@ -18,6 +19,7 @@ const width = Number(opt('width', '1280'));
 const height = Number(opt('height', '720'));
 const settle = Number(opt('wait', '1500'));
 const timeout = Number(opt('timeout', '60000'));
+const evalJs = opt('eval', ''); // JavaScript to run in the page once the zone is loaded, before the settle wait
 const url = `http://localhost:${port}/#${hash}`;
 
 const candidates = [
@@ -102,6 +104,10 @@ while (Date.now() - t0 < timeout) {
     break;
   }
   await new Promise((r2) => setTimeout(r2, 250));
+}
+if (loaded && evalJs) {
+  const r = await send('Runtime.evaluate', { expression: evalJs, awaitPromise: true, returnByValue: true });
+  console.log(`eval: ${JSON.stringify(r.result?.result?.value ?? r.result?.exceptionDetails?.text ?? null)}`);
 }
 if (loaded) await new Promise((r) => setTimeout(r, settle));
 const stateR = await send('Runtime.evaluate', { expression: 'window.eqViewer ? JSON.stringify(window.eqViewer.state()) : "null"', returnByValue: true });

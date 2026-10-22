@@ -2,6 +2,10 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+import { Emitter, type ViewerCtx } from './context.ts';
+import { initMaps } from './maps.ts';
+import { initMinimap } from './minimap.ts';
+import { initBookmarks } from './bookmarks.ts';
 
 // Fast raycasts against zone geometry (walk mode, "Go to /loc").
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
@@ -30,6 +34,8 @@ const scene = new THREE.Scene();
 const SKY = new THREE.Color(0x8fb4d9);
 scene.background = SKY;
 const camera = new THREE.PerspectiveCamera(70, 1, 1, 30000);
+camera.layers.enable(1); // layer 1: screen-space labels (map labels), left out of top-down renders
+const events = new Emitter();
 const hemi = new THREE.HemisphereLight(0xdfe9ff, 0x6b5a3a, 1.1);
 const sun = new THREE.DirectionalLight(0xffffff, 1.4);
 sun.position.set(0.4, 1, 0.3);
@@ -59,6 +65,8 @@ const opts = {
   cull: $<HTMLInputElement>('opt-cull'),
   vcolor: $<HTMLInputElement>('opt-vcolor'),
   walk: $<HTMLInputElement>('opt-walk'),
+  maplines: $<HTMLInputElement>('opt-maplines'),
+  maplabels: $<HTMLInputElement>('opt-maplabels'),
   ambient: $<HTMLInputElement>('opt-ambient'),
   speed: $<HTMLInputElement>('opt-speed'),
   fov: $<HTMLInputElement>('opt-fov'),
@@ -240,6 +248,7 @@ async function loadZone(z: ZoneInfo): Promise<void> {
     showWarnings(extras);
     hintEl.classList.remove('hidden');
     rememberLastZone(z.name);
+    events.emit('zoneLoaded', z, extras);
   } catch (e: any) {
     console.error(e);
     setProgress(-1);
@@ -292,7 +301,7 @@ function kindOf(o: THREE.Object3D | null): string | undefined {
 }
 
 // ---------- Remembered settings ----------
-const PREF_KEYS = ['objects', 'lit', 'fog', 'wireframe', 'cull', 'vcolor', 'ambient', 'fov'] as const;
+const PREF_KEYS = ['objects', 'lit', 'fog', 'wireframe', 'cull', 'vcolor', 'ambient', 'fov', 'maplines', 'maplabels'] as const;
 function savePrefs(): void {
   try {
     const out: Record<string, string | boolean> = {};
@@ -346,6 +355,7 @@ function clearZone(): void {
   animated.length = 0;
   walk.ready = false;
   zoneRoot = null;
+  events.emit('zoneCleared');
 }
 
 function setupMaterials(gltf: any): void {
@@ -926,6 +936,7 @@ function tick(): void {
       a.material.needsUpdate = false;
     }
   }
+  events.emit('frame', dt);
   renderer.render(scene, camera);
   fpsAcc += dt;
   fpsFrames++;
@@ -1037,6 +1048,68 @@ function bootFromHash(): void {
   if (z) void loadZone(z);
 }
 loadPrefs();
+
+// ---------- Feature modules ----------
+/** Move the camera; with ground=true it lands at eye height on the floor below (or floats on water). */
+function goTo(x: number, y: number, z: number, o: { ground?: boolean } = {}): void {
+  camera.position.set(x, y, z);
+  if (o.ground && zoneRoot) {
+    const hit = groundBelow(x, y + 50, z);
+    if (hit) camera.position.y = hit.point.y + EYE_HEIGHT;
+    const water = waterSurfaceAbove(camera.position);
+    if (water !== null && !walk.enabled) camera.position.y = water + EYE_HEIGHT;
+  }
+  if (walk.enabled && walk.ready) settleOnGround();
+  pitch = Math.max(Math.min(pitch, 0.3), -0.3);
+  updateCameraRotation();
+}
+
+async function loadZoneByName(name: string): Promise<boolean> {
+  const z = zones.find((zz) => zz.name === name.toLowerCase());
+  if (!z) return false;
+  await loadZone(z);
+  return currentZone?.name === z.name && !!zoneRoot;
+}
+
+/** URL fragment that restores the current zone, camera and walk mode. */
+function viewLink(): string {
+  const p = camera.position;
+  const parts = [`zone=${currentZone?.name ?? ''}`, `cam=${p.x.toFixed(1)},${p.y.toFixed(1)},${p.z.toFixed(1)},${yaw.toFixed(3)},${pitch.toFixed(3)}`];
+  if (walk.enabled) parts.push('walk=1');
+  return `#${parts.join('&')}`;
+}
+
+const ctx: ViewerCtx = {
+  scene,
+  camera,
+  renderer,
+  canvas,
+  events,
+  $,
+  zone: () => currentZone,
+  zones: () => zones,
+  zoneRoot: () => zoneRoot,
+  bounds: () => zoneBounds,
+  yaw: () => yaw,
+  pitch: () => pitch,
+  heading: () => ((-yaw * 180) / Math.PI + 90 + 720) % 360,
+  setView: (y, p) => {
+    yaw = y;
+    pitch = p;
+    updateCameraRotation();
+  },
+  goTo,
+  loadZone: loadZoneByName,
+  walking: () => walk.enabled,
+  swimming: () => walk.swimming,
+  setWalkMode,
+  setStatus,
+  layers: { labels: 1 },
+  viewLink,
+};
+initMaps(ctx);
+initMinimap(ctx);
+initBookmarks(ctx);
 
 /** Small scripting surface for the console and for tools/shot.ts. */
 (window as any).eqViewer = {

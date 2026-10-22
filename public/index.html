@@ -30,6 +30,8 @@
         <label><input type="checkbox" id="opt-cull" /> Backface culling</label>
         <label><input type="checkbox" id="opt-vcolor" checked /> Vertex lighting</label>
         <label><input type="checkbox" id="opt-walk" /> Walk mode (gravity &amp; collision)</label>
+        <label><input type="checkbox" id="opt-maplines" checked /> Map lines</label>
+        <label><input type="checkbox" id="opt-maplabels" checked /> Map labels</label>
         <label>Daylight <input type="range" id="opt-ambient" min="0" max="100" value="85" /></label>
         <label>Speed <input type="range" id="opt-speed" min="0" max="100" value="45" /></label>
         <label>FOV <input type="range" id="opt-fov" min="40" max="110" value="70" /></label>
@@ -38,6 +40,25 @@
           <button id="btn-reset">Return to start</button>
           <button id="btn-top">Top view</button>
           <a id="btn-export" href="#" download>Export GLB</a>
+        </div>
+      </details>
+      <details id="poi" open>
+        <summary>Points of interest</summary>
+        <input id="poi-filter" type="search" placeholder="Filter points…" autocomplete="off" />
+        <div id="poi-count" class="muted"></div>
+        <ul id="poi-list"></ul>
+      </details>
+      <details id="bookmarks">
+        <summary>Bookmarks &amp; sharing</summary>
+        <ul id="bm-list"></ul>
+        <div class="row">
+          <input id="bm-name" type="text" placeholder="Bookmark name (optional)" />
+          <button id="bm-add" type="button" title="Bookmark the current position and view">Add here</button>
+        </div>
+        <div class="row">
+          <button id="btn-link" type="button" title="Copy a link that opens this zone at this exact view">Copy link</button>
+          <button id="btn-shot" type="button" title="Save a screenshot of the view">Screenshot</button>
+          <button id="btn-topdown" type="button" title="Save a 4096-pixel top-down map of the zone">Export map</button>
         </div>
       </details>
       <details id="help">
@@ -66,6 +87,10 @@
     <div id="toolbar">
       <button id="btn-walk" type="button" title="Explore on foot with gravity and collision (G)">Walk mode: off</button>
       <button id="btn-start" type="button" title="Back to the zone's start point (R)">Return to start</button>
+    </div>
+    <div id="corner">
+      <canvas id="compass" width="72" height="72" title="Compass: the pointer is the direction you face"></canvas>
+      <canvas id="minimap" width="400" height="400" title="Click to teleport · mouse wheel to zoom"></canvas>
     </div>
     <div id="warnings" class="hidden"></div>
     <div id="hint" class="hidden">Drag to look around · W A S D to move · scroll wheel for speed</div>

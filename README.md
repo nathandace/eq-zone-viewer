@@ -115,6 +115,27 @@ The **Settings** panel has:
 
 The top-right box lists build statistics and any warnings (for example textures the viewer could not find).
 
+### Maps, points of interest and travelling between zones
+
+The game ships in-game map files (the `maps` folder of your install, which map packs such as Brewall's or
+Good's replace with much richer versions). The viewer draws them in the world:
+
+- **Map lines** follow the terrain, and **Map labels** float over their spots; both can be switched off in
+  Settings.
+- The **Points of interest** list in the sidebar holds every label of the current zone. Click one to go
+  there. Labels that mark a zone line, such as "to Clan Crushbone", are shown first and tagged **zone
+  line**: clicking one loads that zone and puts you at its matching zone line, so you can walk from zone
+  to zone the way a character would. Walk mode stays on across the crossing.
+- The **minimap** in the bottom-right corner is a top-down render of the zone with the map lines and your
+  position and heading. Click it to teleport, use the mouse wheel over it to zoom in up to 8×. The
+  **compass** above it shows north and the direction you face.
+
+### Bookmarks and sharing
+
+The **Bookmarks & sharing** section saves named camera positions per zone in your browser, copies a link
+that opens the current zone at the exact view (walk mode included), saves a **screenshot** of the view,
+and **exports a 4096-pixel top-down map** of the zone as a PNG.
+
 ### Bookmarkable URLs
 
 Everything after `#` in the address bar restores a view, so links can be shared or bookmarked:
