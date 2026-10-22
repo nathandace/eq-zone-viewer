@@ -83,7 +83,7 @@ Click the 3D view to capture the mouse; **Esc** releases it.
 | **Q** / **C** | Down |
 | **Shift** / **Ctrl** | Fast / slow |
 | Mouse wheel | Change movement speed |
-| **R** | Reset the camera to the zone's start point |
+| **R** | Return to the zone's start point (standing on the ground in walk mode) |
 | **T** | Top-down view of the whole zone |
 | **O** | Toggle placed objects (trees, rocks, furniture) |
 | **G** | Toggle walk mode (see below); **Space** jumps while walking |
@@ -96,15 +96,18 @@ The **Settings** panel has:
 - **Wireframe** and **Backface culling**: handy for finding geometry problems.
 - **Vertex lighting**: EverQuest bakes torches, lamps and shadows into vertex colors; turn this off to see
   the raw textures.
-- **Walk mode**: off by default, so the camera flies freely through everything. Turn it on to explore
-  on foot like a character: gravity pulls you to the ground, walls and objects block you, small steps and
-  slopes are climbed, and Space jumps. Shift sprints, Ctrl walks slowly. Water does not block you, and
-  falling out of the world puts you back at the zone's start point.
+- **Walk mode**: off by default, so the camera flies freely through everything. Turn it on with the
+  **Walk mode** button at the top of the view (or **G**) to explore on foot like a character: gravity
+  pulls you to the ground, walls and objects block you, small steps and slopes are climbed, and Space
+  jumps. Shift sprints, Ctrl walks slowly. Water does not block you, and falling out of the world puts
+  you back at the zone's start point. Picking another zone switches walk mode off again.
+- **Return to start** (button at the top of the view, or **R**): back to the zone's start point, on the
+  ground when walking.
 - **Daylight**: ambient light level. Lower it in a classic zone to see the baked-in lamps and torches.
 - **Speed** and **FOV** sliders.
 - **Go to /loc**: paste the numbers from the in-game `/loc` command (`Y, X` and optionally `Z`) and press
   Enter; without `Z` the camera is placed on the ground at that spot.
-- **Reset camera**, **Top view**, and **Export GLB**, which downloads the zone as a standard glTF binary
+- **Return to start**, **Top view**, and **Export GLB**, which downloads the zone as a standard glTF binary
   that Blender, Windows 3D Viewer and most engines can open.
 
 The top-right box lists build statistics and any warnings (for example textures the viewer could not find).

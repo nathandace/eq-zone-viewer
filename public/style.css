@@ -400,3 +400,36 @@ details summary {
 #setup .row button:hover {
   filter: brightness(1.1);
 }
+
+/* ---------- view toolbar (walk mode + return to start) ---------- */
+#toolbar {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 5;
+}
+
+#toolbar button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(29, 32, 38, 0.92);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+#toolbar button:hover {
+  border-color: var(--accent);
+}
+
+#toolbar button.on {
+  background: var(--accent);
+  border-color: var(--accent2);
+  color: #1a1407;
+}

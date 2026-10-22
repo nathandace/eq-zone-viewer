@@ -34,7 +34,7 @@
         <label>FOV <input type="range" id="opt-fov" min="40" max="110" value="70" /></label>
         <label>Go to /loc <input id="goto" type="text" placeholder="Y, X [, Z]  then Enter" /></label>
         <div class="row">
-          <button id="btn-reset">Reset camera</button>
+          <button id="btn-reset">Return to start</button>
           <button id="btn-top">Top view</button>
           <a id="btn-export" href="#" download>Export GLB</a>
         </div>
@@ -54,6 +54,10 @@
     <div id="hud">
       <div id="status">Select a zone</div>
       <div id="stats" class="muted"></div>
+    </div>
+    <div id="toolbar">
+      <button id="btn-walk" type="button" title="Explore on foot with gravity and collision (G)">Walk mode: off</button>
+      <button id="btn-start" type="button" title="Back to the zone's start point (R)">Return to start</button>
     </div>
     <div id="warnings" class="hidden"></div>
     <div id="hint" class="hidden">Click to look around</div>

@@ -197,6 +197,7 @@ let loadToken = 0;
 async function loadZone(z: ZoneInfo): Promise<void> {
   const token = ++loadToken;
   currentZone = z;
+  if (walk.enabled) setWalkMode(false); // walk mode is per zone: a new zone starts in free flight
   if (!location.hash.includes(`zone=${z.name}`)) location.hash = `zone=${z.name}`;
   renderList();
   setStatus(`Loading ${z.longName}… (first load builds the zone, this can take a few seconds)`);
@@ -228,7 +229,6 @@ async function loadZone(z: ZoneInfo): Promise<void> {
     applyFog();
     resetCamera();
     applyHashCamera();
-    if (walk.enabled) setWalkMode(true);
     setStatus(`${z.longName}  (${z.name})`);
     showWarnings(extras);
   } catch (e: any) {
@@ -402,10 +402,23 @@ function settleOnGround(): void {
 function setWalkMode(on: boolean): void {
   walk.enabled = on;
   opts.walk.checked = on;
+  const btn = $('btn-walk');
+  btn.classList.toggle('on', on);
+  btn.textContent = on ? 'Walk mode: on' : 'Walk mode: off';
   if (on && zoneRoot) {
     prepareCollision();
     settleOnGround();
     // Look at the horizon rather than straight down at the map.
+    pitch = Math.max(pitch, -0.1);
+    updateCameraRotation();
+  }
+}
+
+/** Back to the zone's start point: the overview in free flight, standing on the ground in walk mode. */
+function returnToStart(): void {
+  resetCamera();
+  if (walk.enabled && zoneRoot) {
+    settleOnGround();
     pitch = Math.max(pitch, -0.1);
     updateCameraRotation();
   }
@@ -596,7 +609,7 @@ canvas.addEventListener('wheel', (e) => {
 window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return;
   keys.add(e.code);
-  if (e.code === 'KeyR') resetCamera();
+  if (e.code === 'KeyR') returnToStart();
   if (e.code === 'KeyT') topView();
   if (e.code === 'KeyG') setWalkMode(!walk.enabled);
   if (e.code === 'KeyO') {
@@ -637,7 +650,9 @@ opts.fov.addEventListener('input', () => {
   camera.fov = Number(opts.fov.value);
   camera.updateProjectionMatrix();
 });
-$('btn-reset').addEventListener('click', resetCamera);
+$('btn-reset').addEventListener('click', returnToStart);
+$('btn-start').addEventListener('click', returnToStart);
+$('btn-walk').addEventListener('click', () => setWalkMode(!walk.enabled));
 $('btn-top').addEventListener('click', topView);
 $<HTMLInputElement>('goto').addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
