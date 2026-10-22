@@ -229,6 +229,7 @@ async function loadZone(z: ZoneInfo): Promise<void> {
     applyFog();
     resetCamera();
     applyHashCamera();
+    if (walk.enabled && !walk.ready && !walk.preparing) setWalkMode(true); // switched on while this zone was loading
     setStatus(`${z.longName}  (${z.name})`);
     showWarnings(extras);
     hintEl.classList.remove('hidden');
@@ -318,7 +319,7 @@ const GRAVITY = 60;
 const JUMP_SPEED = 20;
 const WALK_SPEED = 45;
 const SWIM_SPEED = 25;
-const walk = { enabled: false, vy: 0, grounded: false, ready: false, swimming: false };
+const walk = { enabled: false, vy: 0, grounded: false, ready: false, preparing: false, swimming: false };
 const walkRay = new THREE.Raycaster();
 walkRay.firstHitOnly = true;
 const DOWN = new THREE.Vector3(0, -1, 0);
@@ -431,15 +432,31 @@ function setWalkMode(on: boolean): void {
   const btn = $('btn-walk');
   btn.classList.toggle('on', on);
   btn.textContent = on ? 'Walk mode: on' : 'Walk mode: off';
-  if (on && zoneRoot) {
-    prepareCollision();
+  if (!on || !zoneRoot) return;
+  const place = () => {
     settleOnGround();
     // Look at the horizon rather than straight down at the map.
     pitch = Math.max(pitch, -0.1);
     updateCameraRotation();
     const water = waterSurfaceAbove(camera.position);
     console.log(`[walk] on at /loc ${camera.position.x.toFixed(1)}, ${(-camera.position.z).toFixed(1)}, ${camera.position.y.toFixed(1)}${water !== null ? ` (under water, surface at ${water.toFixed(1)})` : ''}`);
+  };
+  if (walk.ready) {
+    place();
+    return;
   }
+  if (walk.preparing) return;
+  // Building the collision trees blocks for up to a few seconds on big zones: show why, then do it.
+  walk.preparing = true;
+  const title = statusEl.textContent;
+  setStatus('Preparing collision…');
+  setTimeout(() => {
+    walk.preparing = false;
+    if (!walk.enabled || !zoneRoot) return;
+    prepareCollision();
+    place();
+    setStatus(currentZone ? `${currentZone.longName}  (${currentZone.name})` : title || '');
+  }, 30);
 }
 
 /** Back to the zone's start point: the overview in free flight, standing on the ground in walk mode. */
@@ -660,7 +677,11 @@ window.addEventListener('mousemove', (e) => {
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 // A clicked button keeps keyboard focus, which would make Space re-trigger it instead of jumping or flying up.
 document.addEventListener('click', (e) => {
-  if (e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement) e.target.blur();
+  const t = e.target;
+  if (t instanceof HTMLButtonElement || t instanceof HTMLAnchorElement || (t instanceof HTMLInputElement && t.type === 'checkbox')) t.blur();
+});
+document.addEventListener('change', (e) => {
+  if (e.target instanceof HTMLInputElement && e.target.type === 'range') e.target.blur();
 });
 canvas.addEventListener('wheel', (e) => {
   speed *= Math.pow(1.15, -Math.sign(e.deltaY));
@@ -668,9 +689,12 @@ canvas.addEventListener('wheel', (e) => {
   opts.speed.value = String(Math.round((Math.log(speed / 10) / Math.log(200)) * 100));
   e.preventDefault();
 });
+const keyTimes = new Map<string, number>();
+const isTextInput = (t: EventTarget | null): boolean => t instanceof HTMLInputElement && !['checkbox', 'range', 'button'].includes(t.type);
 window.addEventListener('keydown', (e) => {
-  if (e.target instanceof HTMLInputElement) return;
+  if (isTextInput(e.target)) return;
   keys.add(e.code);
+  keyTimes.set(e.code, performance.now());
   if (e.code === 'KeyR') returnToStart();
   if (e.code === 'KeyT') topView();
   if (e.code === 'KeyG') setWalkMode(!walk.enabled);
@@ -680,7 +704,17 @@ window.addEventListener('keydown', (e) => {
     applyVisibility();
   }
 });
-window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('keyup', (e) => {
+  keys.delete(e.code);
+  keyTimes.delete(e.code);
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    keys.clear();
+    dragging = false;
+    canvas.classList.remove('dragging');
+  }
+});
 window.addEventListener('blur', () => {
   keys.clear();
   dragging = false;
@@ -764,8 +798,16 @@ function tick(): void {
   requestAnimationFrame(tick);
   const dt = Math.min(clock.getDelta(), 0.1);
   resize();
+  // A key whose keyup was lost (focus change, context menu, tab switch) would run forever:
+  // held keys auto-repeat, so a movement key with no keydown for 3 s is treated as released.
+  if (keys.size) {
+    const now = performance.now();
+    for (const k of keys) {
+      if (!k.startsWith('Shift') && !k.startsWith('Control') && now - (keyTimes.get(k) ?? now) > 3000) keys.delete(k);
+    }
+  }
   // movement
-  if (walk.enabled && zoneRoot) walkStep(dt);
+  if (walk.enabled && zoneRoot && walk.ready) walkStep(dt);
   const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
   const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   velocity.set(0, 0, 0);
