@@ -14,7 +14,7 @@ import { decodeTexture, encodePng, downsample } from './textures.ts';
 import { APP_DIR, CONFIG_PATH, candidateEqDirs, loadConfig, looksLikeEqDir, saveEqDir } from './config.ts';
 
 /** Bump when the parsers or the GLB layout change so cached zone builds are discarded. */
-const BUILD_VERSION = 1;
+const BUILD_VERSION = 2;
 const PUBLIC_DIR = join(APP_DIR, 'public');
 const CACHE_ROOT = join(APP_DIR, 'cache', `v${BUILD_VERSION}`);
 const MAX_TEXTURE_SIZE = 2048;

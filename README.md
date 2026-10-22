@@ -100,8 +100,10 @@ The **Settings** panel has:
 - **Walk mode**: off by default, so the camera flies freely through everything. Turn it on with the
   **Walk mode** button at the top of the view (or **G**) to explore on foot like a character: gravity
   pulls you to the ground, walls and objects block you, small steps and slopes are climbed, and Space
-  jumps. Shift sprints, Ctrl walks slowly. Water does not block you, and falling out of the world puts
-  you back at the zone's start point. Picking another zone switches walk mode off again.
+  jumps. Shift sprints, Ctrl walks slowly. Under water you swim: you move in the direction you look,
+  E or Space swims up, Q or C dives, nothing pulls you down, and walking up the bank brings you back
+  out. Falling out of the world puts you back at the zone's start point, and picking another zone
+  switches walk mode off again.
 - **Return to start** (button at the top of the view, or **R**): back to the zone's start point, on the
   ground when walking.
 - **Daylight**: ambient light level. Lower it in a classic zone to see the baked-in lamps and torches.

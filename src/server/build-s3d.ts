@@ -128,7 +128,7 @@ export class S3dBuilder {
   }
 
   /** Append a 0x36 mesh (optionally pre-transformed in EQ space) to a merger. */
-  private appendMesh(ctx: WldContext, meshFrag: Frag, merger: MeshMerger, transform?: (p: Vec3) => Vec3, boneTransforms?: Transform[]): void {
+  private appendMesh(ctx: WldContext, meshFrag: Frag, merger: MeshMerger, transform?: (p: Vec3) => Vec3, boneTransforms?: Transform[], liquidMerger?: MeshMerger): void {
     const { wld } = ctx;
     const m = wld.mesh(meshFrag);
     const listFrag = wld.frag(m.materialListRef);
@@ -180,13 +180,32 @@ export class S3dBuilder {
       }
     }
     const base = merger.addVertices(positions, normals, uvs, colors);
+    // Polygons flagged non-solid (0x10) are the water and lava surfaces: when a liquid merger is given they go
+    // there instead, so the viewer can walk through them and swim under them.
+    const NON_SOLID = 0x10;
+    const hasLiquid = !!liquidMerger && m.polyFlags.some((f) => (f & NON_SOLID) !== 0);
+    const liquidBase = hasLiquid ? liquidMerger!.addVertices(positions, normals, uvs, colors) : 0;
+    const addTriangles = (mat: number, start: number, end: number) => {
+      if (!hasLiquid) {
+        merger.addTriangles(mat, m.indices, base, start, end);
+        return;
+      }
+      const solid: number[] = [];
+      const liquid: number[] = [];
+      for (let i = start; i < end; i += 3) {
+        const dst = (m.polyFlags[i / 3] & NON_SOLID) !== 0 ? liquid : solid;
+        dst.push(m.indices[i], m.indices[i + 1], m.indices[i + 2]);
+      }
+      if (solid.length) merger.addTriangles(mat, solid, base);
+      if (liquid.length) liquidMerger!.addTriangles(mat, liquid, liquidBase);
+    };
     let poly = 0;
     const polyCount = m.indices.length / 3;
     if (m.materialGroups.length === 0) {
       // No groups: everything uses material 0
       const mf = wld.frag(refs[0]);
       const mat = mf?.type === 0x30 ? this.materialFor(ctx, mf) : this.fallbackMaterial();
-      merger.addTriangles(mat, m.indices, base);
+      addTriangles(mat, 0, polyCount * 3);
       return;
     }
     for (const group of m.materialGroups) {
@@ -194,13 +213,13 @@ export class S3dBuilder {
       const mat = mf?.type === 0x30 ? this.materialFor(ctx, mf) : this.fallbackMaterial();
       const start = poly * 3;
       const end = Math.min(polyCount, poly + group.count) * 3;
-      merger.addTriangles(mat, m.indices, base, start, end);
+      addTriangles(mat, start, end);
       poly += group.count;
     }
     if (poly < polyCount) {
       const mf = wld.frag(refs[0]);
       const mat = mf?.type === 0x30 ? this.materialFor(ctx, mf) : this.fallbackMaterial();
-      merger.addTriangles(mat, m.indices, base, poly * 3, polyCount * 3);
+      addTriangles(mat, poly * 3, polyCount * 3);
     }
   }
 
@@ -285,14 +304,16 @@ export class S3dBuilder {
 
     // Zone geometry: merge every 0x36 fragment.
     const zoneMerger = new MeshMerger('zone');
-    for (const f of zoneCtx.wld.byType(0x36)) this.appendMesh(zoneCtx, f, zoneMerger);
+    const waterMerger = new MeshMerger('water');
+    for (const f of zoneCtx.wld.byType(0x36)) this.appendMesh(zoneCtx, f, zoneMerger, undefined, undefined, waterMerger);
     let triangles = 0;
-    if (!zoneMerger.isEmpty) {
-      const mesh = zoneMerger.build();
+    for (const [merger, kind] of [[zoneMerger, 'zone'], [waterMerger, 'water']] as const) {
+      if (merger.isEmpty) continue;
+      const mesh = merger.build();
       bounds.addPositions(mesh.positions);
       triangles += mesh.groups.reduce((s, g) => s + g.indices.length / 3, 0);
       this.meshes.push(mesh);
-      this.nodes.push({ name: 'zone', kind: 'zone', mesh: this.meshes.length - 1, instances: [{ position: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] }] });
+      this.nodes.push({ name: kind, kind, mesh: this.meshes.length - 1, instances: [{ position: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] }] });
     }
 
     // Object libraries

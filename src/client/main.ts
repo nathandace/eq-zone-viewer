@@ -317,7 +317,8 @@ const BODY_RADIUS = 1.5;
 const GRAVITY = 60;
 const JUMP_SPEED = 20;
 const WALK_SPEED = 45;
-const walk = { enabled: false, vy: 0, grounded: false, ready: false };
+const SWIM_SPEED = 25;
+const walk = { enabled: false, vy: 0, grounded: false, ready: false, swimming: false };
 const walkRay = new THREE.Raycaster();
 walkRay.firstHitOnly = true;
 const DOWN = new THREE.Vector3(0, -1, 0);
@@ -331,6 +332,29 @@ function isCollidable(obj: THREE.Object3D): boolean {
     if (k === 'water' || k === 'sky') return false;
   }
   return true;
+}
+
+function isWater(obj: THREE.Object3D): boolean {
+  for (let o: THREE.Object3D | null = obj; o; o = o.parent) if (o.userData?.eqKind === 'water') return true;
+  return false;
+}
+
+/** Height of the water surface directly above a point, or null when the point is not under water. */
+function waterSurfaceAbove(p: THREE.Vector3): number | null {
+  if (!zoneRoot || !zoneBounds) return null;
+  const top = zoneBounds.max[1] + 10;
+  if (p.y >= top) return null;
+  walkRay.firstHitOnly = false;
+  walkRay.set(new THREE.Vector3(p.x, top, p.z), DOWN);
+  walkRay.near = 0;
+  walkRay.far = top - p.y;
+  let surface: number | null = null;
+  for (const hit of walkRay.intersectObject(zoneRoot, true)) {
+    if (hit.point.y <= p.y || !isWater(hit.object)) continue;
+    if (surface === null || hit.point.y < surface) surface = hit.point.y;
+  }
+  walkRay.firstHitOnly = true;
+  return surface;
 }
 
 /** Build BVH trees for every geometry in the zone the first time walk mode needs them. */
@@ -394,8 +418,11 @@ function settleOnGround(): void {
     }
   }
   if (hit) p.y = hit.point.y + EYE_HEIGHT;
+  // Deep water: float with the eyes just under the surface instead of standing on the bottom.
+  const water = waterSurfaceAbove(p);
+  if (water !== null) p.y = water - 0.5;
   walk.vy = 0;
-  walk.grounded = !!hit;
+  walk.grounded = !!hit && water === null;
 }
 
 function setWalkMode(on: boolean): void {
@@ -410,6 +437,8 @@ function setWalkMode(on: boolean): void {
     // Look at the horizon rather than straight down at the map.
     pitch = Math.max(pitch, -0.1);
     updateCameraRotation();
+    const water = waterSurfaceAbove(camera.position);
+    console.log(`[walk] on at /loc ${camera.position.x.toFixed(1)}, ${(-camera.position.z).toFixed(1)}, ${camera.position.y.toFixed(1)}${water !== null ? ` (under water, surface at ${water.toFixed(1)})` : ''}`);
   }
 }
 
@@ -423,18 +452,30 @@ function returnToStart(): void {
   }
 }
 
-/** One frame of character-style movement: walls block and slide, small ledges are stepped over, gravity and jumping apply. */
+/**
+ * One frame of character-style movement. On land: walls block and slide, small ledges are stepped over,
+ * gravity and jumping apply. Under a water surface: swim in the direction you look, E/Space and Q/C go up
+ * and down, nothing pulls you down, and a rising bottom walks you back out.
+ */
 function walkStep(dt: number): void {
   const p = camera.position;
-  const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+  const surface = waterSurfaceAbove(p);
+  const swimming = surface !== null;
+  walk.swimming = swimming;
+  const kneeAt = () => new THREE.Vector3(p.x, p.y - EYE_HEIGHT + STEP_HEIGHT, p.z);
+  const forward = swimming ? new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion) : new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
   const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
   const move = new THREE.Vector3();
   if (keys.has('KeyW') || keys.has('ArrowUp')) move.add(forward);
   if (keys.has('KeyS') || keys.has('ArrowDown')) move.sub(forward);
   if (keys.has('KeyD') || keys.has('ArrowRight')) move.add(right);
   if (keys.has('KeyA') || keys.has('ArrowLeft')) move.sub(right);
+  if (swimming) {
+    if (keys.has('KeyE') || keys.has('Space')) move.y += 1;
+    if (keys.has('KeyQ') || keys.has('KeyC')) move.y -= 1;
+  }
   if (move.lengthSq() > 0) {
-    let s = WALK_SPEED;
+    let s = swimming ? SWIM_SPEED : WALK_SPEED;
     if (keys.has('ShiftLeft') || keys.has('ShiftRight')) s *= 2;
     if (keys.has('ControlLeft') || keys.has('ControlRight')) s *= 0.4;
     move.normalize().multiplyScalar(s * dt);
@@ -442,16 +483,25 @@ function walkStep(dt: number): void {
     for (let i = 0; i < 2 && move.lengthSq() > 1e-8; i++) {
       const dir = move.clone().normalize();
       const reach = move.length() + BODY_RADIUS;
-      const knee = new THREE.Vector3(p.x, p.y - EYE_HEIGHT + STEP_HEIGHT, p.z);
-      const hit = castRay(knee, dir, reach) ?? castRay(p, dir, reach);
+      const hit = castRay(kneeAt(), dir, reach) ?? castRay(p, dir, reach);
       if (!hit) break;
       const n = hitNormal(hit, dir);
-      n.y = 0;
+      if (!swimming) n.y = 0;
       if (n.lengthSq() < 1e-6) break;
       n.normalize();
       move.sub(n.multiplyScalar(move.dot(n)));
     }
     p.add(move);
+  }
+  if (swimming) {
+    // Neutral buoyancy: no gravity, leftover fall speed bleeds off, eyes stay just under the surface.
+    walk.vy *= Math.max(0, 1 - 4 * dt);
+    p.y += walk.vy * dt;
+    if (p.y > surface - 0.5) p.y = surface - 0.5;
+    const ground = castRay(kneeAt(), DOWN, STEP_HEIGHT + 0.5);
+    walk.grounded = !!ground;
+    if (ground) p.y = Math.max(p.y, ground.point.y + EYE_HEIGHT);
+    return;
   }
   // Vertical: jump, gravity, head bumps, landing.
   if ((keys.has('Space') || keys.has('KeyE')) && walk.grounded) {
@@ -460,7 +510,7 @@ function walkStep(dt: number): void {
   }
   walk.vy = Math.max(walk.vy - GRAVITY * dt, -400);
   const dy = walk.vy * dt;
-  const knee = new THREE.Vector3(p.x, p.y - EYE_HEIGHT + STEP_HEIGHT, p.z);
+  const knee = kneeAt();
   if (dy < 0) {
     // Look down from knee height so steps and slopes under STEP_HEIGHT are climbed and we never tunnel through a floor.
     const ground = castRay(knee, DOWN, STEP_HEIGHT - dy + (walk.grounded ? 1.5 : 0.1));
@@ -560,10 +610,11 @@ function goToLoc(locY: number, locX: number, locZ?: number): void {
   const gz = -locX;
   let gy = locZ;
   if (gy === undefined && zoneRoot) {
-    const ray = new THREE.Raycaster(new THREE.Vector3(gx, 20000, gz), new THREE.Vector3(0, -1, 0), 0, 40000);
-    const hits = ray.intersectObject(zoneRoot, true).filter((h) => h.object.userData?.eqKind !== 'object');
-    // Use the lowest surface so indoor zones land on the floor rather than the roof.
-    gy = hits.length ? hits[hits.length - 1].point.y + 6 : 50;
+    // Use the lowest solid surface so indoor zones land on the floor rather than the roof; over water, float above it.
+    const hit = groundBelow(gx, 20000, gz);
+    gy = hit ? hit.point.y + EYE_HEIGHT : 50;
+    const water = waterSurfaceAbove(new THREE.Vector3(gx, gy, gz));
+    if (water !== null) gy = water + EYE_HEIGHT;
   }
   camera.position.set(gx, gy ?? 50, gz);
   pitch = Math.max(Math.min(pitch, 0), -0.15);
@@ -751,7 +802,7 @@ function tick(): void {
     const p = camera.position;
     const info = renderer.info.render;
     statsEl.textContent = `${fps.toFixed(0)} fps   ${info.calls} draws   ${(info.triangles / 1000).toFixed(0)}k tris
-/loc ${p.x.toFixed(1)}, ${(-p.z).toFixed(1)}, ${p.y.toFixed(1)}   heading ${(((-yaw * 180) / Math.PI + 90 + 720) % 360).toFixed(0)}°   speed ${speed.toFixed(0)}`;
+/loc ${p.x.toFixed(1)}, ${(-p.z).toFixed(1)}, ${p.y.toFixed(1)}   heading ${(((-yaw * 180) / Math.PI + 90 + 720) % 360).toFixed(0)}°   speed ${speed.toFixed(0)}   ${walk.enabled ? (walk.swimming ? 'swimming' : 'on foot') : 'flying'}`;
   }
 }
 
