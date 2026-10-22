@@ -191,8 +191,9 @@ Layout:
 - `src/server/zones.ts`: zone discovery and long names.
 - `src/client/main.ts`: the three.js viewer, bundled to `public/bundle.js` by esbuild.
 - `tools/`: `survey.ts` (format census of an install), `inspect.ts` (parser checks),
-  `build-all.ts` (builds every zone and reports failures), `shot.sh` (headless screenshots of the
-  running viewer), `release.ts` (release build).
+  `build-all.ts` (builds every zone and reports failures), `shot.ts` (headless screenshots of the
+  running viewer through Chrome's DevTools protocol, with the page's console output), `release.ts`
+  (release build).
 
 After changing a parser, bump `BUILD_VERSION` in `src/server/main.ts` (or delete `cache/`) so stale builds
 are not served, and run `npm run build-all` to make sure every zone still builds.

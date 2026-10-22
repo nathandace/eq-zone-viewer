@@ -3,13 +3,12 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { exec } from 'node:child_process';
+import { Worker } from 'node:worker_threads';
 import { dirname, extname, join, resolve } from 'node:path';
 import sea from 'node:sea';
 import { PfsArchive } from './pfs.ts';
 import { discoverZones, type ZoneInfo } from './zones.ts';
-import { buildS3dZone } from './build-s3d.ts';
-import { buildEqgZone } from './build-eqg.ts';
-import { buildGlb } from './gltf.ts';
+import type { BuildFailure, BuildRequest, BuildResult } from './build-worker.ts';
 import { decodeTexture, encodePng, downsample } from './textures.ts';
 import { APP_DIR, CONFIG_PATH, candidateEqDirs, loadConfig, looksLikeEqDir, saveEqDir } from './config.ts';
 
@@ -93,12 +92,12 @@ async function buildZone(name: string): Promise<Buffer> {
   const p = (async () => {
     const t0 = Date.now();
     console.log(`[build] ${name} (${info.kind})`);
-    const scene = info.kind === 's3d' ? buildS3dZone(eqDir, name) : buildEqgZone(eqDir, name);
-    const glb = buildGlb(scene);
+    const result = await buildInWorker({ eqDir, name, kind: info.kind as 's3d' | 'eqg' });
+    const glb = Buffer.from(result.glb);
     mkdirSync(dirname(glbPath), { recursive: true });
     writeFileSync(glbPath, glb);
-    writeFileSync(glbPath.replace(/\.glb$/, '.json'), JSON.stringify({ stats: scene.stats, warnings: scene.warnings, bounds: scene.bounds }, null, 1));
-    console.log(`[build] ${name} done in ${Date.now() - t0}ms: ${JSON.stringify(scene.stats)} warnings=${scene.warnings.length}`);
+    writeFileSync(glbPath.replace(/\.glb$/, '.json'), JSON.stringify({ stats: result.stats, warnings: result.warnings, bounds: result.bounds }, null, 1));
+    console.log(`[build] ${name} done in ${Date.now() - t0}ms: ${JSON.stringify(result.stats)} warnings=${result.warnings.length}`);
     return glb;
   })();
   building.set(name, p);
@@ -107,6 +106,32 @@ async function buildZone(name: string): Promise<Buffer> {
   } finally {
     building.delete(name);
   }
+}
+
+/** Convert a zone on a worker thread. From source the worker is the .ts file; in a release build it is an embedded bundle. */
+function buildInWorker(req: BuildRequest): Promise<BuildResult> {
+  return new Promise((resolveBuild, reject) => {
+    const worker = sea.isSea()
+      ? new Worker(Buffer.from(sea.getAsset('build-worker.cjs')).toString('utf8'), { eval: true, workerData: req })
+      : new Worker(new URL('./build-worker.ts', import.meta.url), { workerData: req });
+    let settled = false;
+    worker.once('message', (m: BuildResult | BuildFailure) => {
+      settled = true;
+      if (m.ok) resolveBuild(m);
+      else {
+        const err = new Error(m.error);
+        err.stack = m.stack;
+        reject(err);
+      }
+    });
+    worker.once('error', (e) => {
+      settled = true;
+      reject(e);
+    });
+    worker.once('exit', (code) => {
+      if (!settled) reject(new Error(`build worker exited with code ${code}`));
+    });
+  });
 }
 
 function texturePng(archiveFile: string, file: string, mask: boolean): Buffer | undefined {

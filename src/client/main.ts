@@ -212,12 +212,18 @@ async function loadZone(z: ZoneInfo): Promise<void> {
       const err = await head.json().catch(() => ({ error: head.statusText }));
       throw new Error(err.error || head.statusText);
     }
-    const buf = await head.arrayBuffer();
-    if (token !== loadToken) return;
+    const buf = await readWithProgress(head, token, (received, total) => {
+      setProgress(total ? received / total : -1);
+      setStatus(`Loading ${z.longName}… ${total ? `${Math.round((received / total) * 100)}%` : `${(received / 1e6).toFixed(1)} MB`}`);
+    });
+    if (!buf || token !== loadToken) return;
+    setProgress(-1);
     setStatus(`Loading textures for ${z.longName}…`);
     loader.setPath(`/api/zone/${z.name}/`);
+    const t0 = performance.now();
     const gltf = await loader.parseAsync(buf, `/api/zone/${z.name}/`);
     if (token !== loadToken) return;
+    console.log(`[load] ${z.name}: ${(buf.byteLength / 1e6).toFixed(1)} MB, textures in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
     clearZone();
     zoneRoot = gltf.scene;
     const extras = (gltf.parser.json as any).extras || {};
@@ -233,11 +239,97 @@ async function loadZone(z: ZoneInfo): Promise<void> {
     setStatus(`${z.longName}  (${z.name})`);
     showWarnings(extras);
     hintEl.classList.remove('hidden');
+    rememberLastZone(z.name);
   } catch (e: any) {
     console.error(e);
+    setProgress(-1);
     setStatus(`Failed to load ${z.name}: ${e.message}`);
   }
 }
+
+/** Download a response body in chunks, reporting progress; returns null if the load was superseded. */
+async function readWithProgress(res: Response, token: number, onProgress: (received: number, total: number) => void): Promise<ArrayBuffer | null> {
+  const total = Number(res.headers.get('Content-Length')) || 0;
+  if (!res.body) return res.arrayBuffer();
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  let lastReport = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (token !== loadToken) {
+      void reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+    received += value.length;
+    const now = performance.now();
+    if (now - lastReport > 100) {
+      lastReport = now;
+      onProgress(received, total);
+    }
+  }
+  const out = new Uint8Array(received);
+  let off = 0;
+  for (const c of chunks) {
+    out.set(c, off);
+    off += c.length;
+  }
+  return out.buffer;
+}
+
+const progressEl = $('progress');
+function setProgress(fraction: number): void {
+  progressEl.classList.toggle('hidden', fraction < 0);
+  progressEl.style.width = `${Math.max(2, Math.min(100, fraction * 100))}%`;
+}
+
+/** Kind of a node as tagged by the builder (zone, object, water, sky), looking up through the parents. */
+function kindOf(o: THREE.Object3D | null): string | undefined {
+  for (let p = o; p; p = p.parent) if (p.userData?.eqKind) return p.userData.eqKind;
+  return undefined;
+}
+
+// ---------- Remembered settings ----------
+const PREF_KEYS = ['objects', 'lit', 'fog', 'wireframe', 'cull', 'vcolor', 'ambient', 'fov'] as const;
+function savePrefs(): void {
+  try {
+    const out: Record<string, string | boolean> = {};
+    for (const k of PREF_KEYS) {
+      const el = opts[k];
+      out[k] = el.type === 'checkbox' ? el.checked : el.value;
+    }
+    localStorage.setItem('eqzv.prefs', JSON.stringify(out));
+  } catch {
+    /* storage unavailable */
+  }
+}
+function loadPrefs(): void {
+  try {
+    const raw = localStorage.getItem('eqzv.prefs');
+    if (!raw) return;
+    const saved = JSON.parse(raw) as Record<string, string | boolean>;
+    for (const k of PREF_KEYS) {
+      if (!(k in saved)) continue;
+      const el = opts[k];
+      if (el.type === 'checkbox') el.checked = Boolean(saved[k]);
+      else el.value = String(saved[k]);
+    }
+    opts.ambient.dispatchEvent(new Event('input'));
+    opts.fov.dispatchEvent(new Event('input'));
+  } catch {
+    /* ignore bad data */
+  }
+}
+function rememberLastZone(name: string): void {
+  try {
+    localStorage.setItem('eqzv.lastZone', name);
+  } catch {
+    /* ignore */
+  }
+}
+for (const k of PREF_KEYS) opts[k].addEventListener('change', savePrefs);
 
 function clearZone(): void {
   if (zoneRoot) {
@@ -933,12 +1025,33 @@ $('btn-folder').addEventListener('click', () => void fetchConfig().then(showSetu
 // ---------- Boot ----------
 function bootFromHash(): void {
   const m = /zone=([a-z0-9_\-]+)/i.exec(location.hash);
-  if (!m) return;
-  const z = zones.find((z) => z.name === m[1].toLowerCase());
+  let name = m ? m[1].toLowerCase() : '';
+  if (!name) {
+    try {
+      name = localStorage.getItem('eqzv.lastZone') || '';
+    } catch {
+      /* ignore */
+    }
+  }
+  const z = zones.find((z) => z.name === name);
   if (z) void loadZone(z);
 }
+loadPrefs();
 
-(window as any).eqViewer = { loadZone, zones: () => zones, camera, scene };
+/** Small scripting surface for the console and for tools/shot.ts. */
+(window as any).eqViewer = {
+  loadZone,
+  zones: () => zones,
+  camera,
+  scene,
+  state: () => ({
+    zone: currentZone?.name ?? null,
+    loaded: !!zoneRoot,
+    status: statusEl.textContent,
+    loc: [camera.position.x, -camera.position.z, camera.position.y].map((v) => Math.round(v * 10) / 10),
+    walk: { enabled: walk.enabled, ready: walk.ready, swimming: walk.swimming, grounded: walk.grounded },
+  }),
+};
 fetchConfig()
   .then(async (cfg) => {
     showFolder(cfg);

@@ -63,6 +63,18 @@ await build({
   logLevel: 'warning',
 });
 
+step('Bundling the zone build worker');
+await build({
+  entryPoints: [join(ROOT, 'src/server/build-worker.ts')],
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  target: 'node22',
+  outfile: join(BUILD, 'build-worker.cjs'),
+  logOverride: { 'empty-import-meta': 'silent' },
+  logLevel: 'warning',
+});
+
 step('Preparing the single-executable blob');
 const seaConfig = {
   main: 'server.cjs',
@@ -73,6 +85,7 @@ const seaConfig = {
     'index.html': join(ROOT, 'public', 'index.html'),
     'style.css': join(ROOT, 'public', 'style.css'),
     'bundle.js': join(BUILD, 'bundle.js'),
+    'build-worker.cjs': join(BUILD, 'build-worker.cjs'),
   },
 };
 writeFileSync(join(BUILD, 'sea-config.json'), JSON.stringify(seaConfig, null, 2));

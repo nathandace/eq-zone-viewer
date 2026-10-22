@@ -518,3 +518,16 @@ details summary {
 #about a:hover {
   text-decoration: underline;
 }
+
+/* ---------- zone download progress ---------- */
+#progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 4px;
+  width: 0;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  z-index: 7;
+  transition: width 0.1s linear;
+}
