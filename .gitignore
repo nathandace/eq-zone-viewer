@@ -1,0 +1,14 @@
+# dependencies and build output
+node_modules/
+public/bundle.js
+public/bundle.js.map
+release/
+
+# per-machine state: converted zones and the chosen EverQuest folder
+cache/
+config.json
+
+# editors and OS
+.DS_Store
+Thumbs.db
+*.log

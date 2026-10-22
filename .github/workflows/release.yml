@@ -1,0 +1,33 @@
+# Builds the self-contained Windows release and attaches it to the GitHub release for a tag.
+# Push a tag such as v0.1.0 to trigger it, or run it by hand from the Actions tab.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eq-zone-viewer-windows
+          path: release/*.zip
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: release/*.zip
+          generate_release_notes: true

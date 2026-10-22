@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EQ Zone Viewer</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <aside id="sidebar">
+    <header>
+      <h1>EQ Zone Viewer</h1>
+      <input id="filter" type="search" placeholder="Filter zones…" autocomplete="off" />
+      <div id="zone-count" class="muted"></div>
+    </header>
+    <ul id="zone-list"></ul>
+    <footer>
+      <div id="folder-row" class="muted">
+        <span class="label">EQ folder</span>
+        <span id="eq-folder"></span>
+        <button id="btn-folder" type="button" title="Use a different EverQuest install">Change</button>
+      </div>
+      <details id="settings" open>
+        <summary>Settings</summary>
+        <label><input type="checkbox" id="opt-objects" checked /> Objects</label>
+        <label><input type="checkbox" id="opt-lit" /> Shaded lighting</label>
+        <label><input type="checkbox" id="opt-fog" checked /> Fog</label>
+        <label><input type="checkbox" id="opt-wireframe" /> Wireframe</label>
+        <label><input type="checkbox" id="opt-cull" /> Backface culling</label>
+        <label><input type="checkbox" id="opt-vcolor" checked /> Vertex lighting</label>
+        <label>Daylight <input type="range" id="opt-ambient" min="0" max="100" value="85" /></label>
+        <label>Speed <input type="range" id="opt-speed" min="0" max="100" value="45" /></label>
+        <label>FOV <input type="range" id="opt-fov" min="40" max="110" value="70" /></label>
+        <label>Go to /loc <input id="goto" type="text" placeholder="Y, X [, Z]  then Enter" /></label>
+        <div class="row">
+          <button id="btn-reset">Reset camera</button>
+          <button id="btn-top">Top view</button>
+          <a id="btn-export" href="#" download>Export GLB</a>
+        </div>
+      </details>
+      <details id="help">
+        <summary>Controls</summary>
+        <p>Click the view to capture the mouse, <b>Esc</b> to release.<br />
+          <b>W A S D</b> move · <b>Q / C</b> down · <b>E / Space</b> up<br />
+          <b>Shift</b> fast · <b>Ctrl</b> slow · <b>Mouse wheel</b> speed<br />
+          <b>R</b> reset camera · <b>O</b> toggle objects · <b>T</b> top view</p>
+      </details>
+    </footer>
+  </aside>
+  <main id="view">
+    <canvas id="canvas"></canvas>
+    <div id="hud">
+      <div id="status">Select a zone</div>
+      <div id="stats" class="muted"></div>
+    </div>
+    <div id="warnings" class="hidden"></div>
+    <div id="hint" class="hidden">Click to look around</div>
+    <div id="setup" class="hidden">
+      <div class="panel">
+        <h2>Where is EverQuest installed?</h2>
+        <p>The viewer reads zone files straight from your own EverQuest install. Nothing in the game folder is copied or changed.</p>
+        <p id="setup-msg" class="muted"></p>
+        <div id="setup-candidates" class="hidden"></div>
+        <input id="setup-path" type="text" placeholder="C:\Users\Public\Daybreak Game Company\Installed Games\EverQuest" spellcheck="false" autocomplete="off" />
+        <div class="row">
+          <button id="setup-ok" type="button">Use this folder</button>
+          <button id="setup-cancel" type="button" class="secondary hidden">Cancel</button>
+        </div>
+        <p class="muted small">The choice is saved to <code>config.json</code> next to the app. You can also set the <code>EQ_DIR</code> environment variable or pass the folder on the command line.</p>
+      </div>
+    </div>
+  </main>
+  <script src="/bundle.js"></script>
+</body>
+</html>

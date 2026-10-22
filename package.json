@@ -1,0 +1,50 @@
+{
+  "name": "eq-zone-viewer",
+  "version": "0.1.0",
+  "description": "Browse EverQuest zones in 3D, read straight from your own game install",
+  "private": true,
+  "license": "MIT",
+  "author": "Nathan Dace",
+  "homepage": "https://github.com/nathandace/eq-zone-viewer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nathandace/eq-zone-viewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nathandace/eq-zone-viewer/issues"
+  },
+  "keywords": [
+    "everquest",
+    "eq",
+    "zone",
+    "viewer",
+    "3d",
+    "three.js",
+    "s3d",
+    "eqg",
+    "wld",
+    "gltf"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "build": "esbuild src/client/main.ts --bundle --outfile=public/bundle.js --format=iife --sourcemap --target=es2022",
+    "start": "npm run build && node src/server/main.ts",
+    "dev": "node src/server/main.ts",
+    "typecheck": "tsc --noEmit",
+    "build-all": "node tools/build-all.ts",
+    "release": "node tools/release.ts"
+  },
+  "dependencies": {
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/three": "^0.182.0",
+    "esbuild": "^0.25.12",
+    "postject": "^1.0.0-alpha.6",
+    "typescript": "^5.9.3"
+  }
+}
