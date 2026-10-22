@@ -1,6 +1,6 @@
 // HTTP server: serves the viewer, the zone list, built zone GLBs and decoded textures.
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync, readdirSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { exec } from 'node:child_process';
 import { Worker } from 'node:worker_threads';
@@ -199,6 +199,24 @@ function readBody(req: IncomingMessage, limit = 64 * 1024): Promise<string> {
   });
 }
 
+/** Size of the current install's cache folder. */
+function cacheInfo(): { dir: string; bytes: number; files: number } {
+  let bytes = 0;
+  let files = 0;
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else {
+        bytes += statSync(p).size;
+        files++;
+      }
+    }
+  };
+  if (existsSync(cacheDir)) walk(cacheDir);
+  return { dir: cacheDir, bytes, files };
+}
+
 function configInfo(): Record<string, unknown> {
   return {
     eqDir: config.eqDir,
@@ -241,6 +259,18 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       return;
     }
     sendJson(res, 200, configInfo());
+    return;
+  }
+  if (path === '/api/cache') {
+    sendJson(res, 200, cacheInfo());
+    return;
+  }
+  if (path === '/api/cache/clear' && req.method === 'POST') {
+    for (const pending of building.values()) await pending.catch(() => undefined);
+    rmSync(cacheDir, { recursive: true, force: true });
+    mkdirSync(cacheDir, { recursive: true });
+    console.log(`[cache] cleared ${cacheDir}`);
+    sendJson(res, 200, cacheInfo());
     return;
   }
   if (path === '/api/zones') {

@@ -200,9 +200,12 @@ a [three.js](https://threejs.org/) viewer with a free-fly camera and a custom sh
 EverQuest's baked vertex lighting.
 
 Converted zones and textures are cached under `cache/` (next to the exe, or in the project folder when
-running from source). Delete that folder to force a rebuild; it is regenerated on demand. Each EverQuest
-install gets its own cache sub-folder, and the cache is tagged with a build version so parser changes
-invalidate it automatically.
+running from source). The **Cache** button next to the EverQuest folder shows its size and clears it
+when clicked twice; it is regenerated on demand. Each EverQuest install gets its own cache sub-folder,
+and the cache is tagged with a build version so parser changes invalidate it automatically.
+
+The viewer checks GitHub once a day for a newer release and shows a link in the menu footer when there
+is one. Nothing else leaves your machine.
 
 Coordinates: EverQuest stores positions as (north, west, up). The viewer maps that to glTF space as
 x = north, y = up, z = east, which is why the `/loc` readout in the status line matches the game.
@@ -214,7 +217,8 @@ npm install          # once
 npm start            # build the browser bundle and start the server on http://localhost:3080/
 npm run dev          # start the server without rebuilding the bundle
 npm run build        # rebuild public/bundle.js only
-npm run typecheck    # tsc --noEmit over src/ and tools/
+npm run typecheck    # tsc --noEmit over src/, tools/ and tests/
+npm test             # unit tests (PFS reader, texture decoders, map files, config, zone names)
 npm run build-all    # build every zone without the server and write cache/build-report.json
 npm run release      # self-contained executable + zip under release/
 ```
@@ -244,7 +248,8 @@ are not served, and run `npm run build-all` to make sure every zone still builds
 `npm run release` bundles the server and the viewer with esbuild, embeds them in a copy of the running
 Node.js binary using Node's single-executable-application support, and zips the result with the docs.
 It is built for whatever platform runs it; the GitHub Actions workflow in `.github/workflows/release.yml`
-builds the Windows x64 zip and attaches it to a release whenever a `v*` tag is pushed:
+builds the Windows x64 zip (and, best effort, macOS and Linux ones) and attaches them to a release
+whenever a `v*` tag is pushed:
 
 ```
 git tag v0.1.0

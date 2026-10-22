@@ -1,5 +1,6 @@
-# Builds the self-contained Windows release and attaches it to the GitHub release for a tag.
-# Push a tag such as v0.1.0 to trigger it, or run it by hand from the Actions tab.
+# Builds the self-contained releases and attaches them to the GitHub release for a tag.
+# Push a tag such as v0.2.0 to trigger it, or run it by hand from the Actions tab.
+# Windows is the primary target; the macOS and Linux builds are best effort and do not fail the run.
 name: Release
 
 on:
@@ -11,8 +12,22 @@ permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+            required: true
+          - os: macos-latest
+            name: macos
+            required: false
+          - os: ubuntu-latest
+            name: linux
+            required: false
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ !matrix.required }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,10 +36,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
       - run: npm run release
       - uses: actions/upload-artifact@v4
         with:
-          name: eq-zone-viewer-windows
+          name: eq-zone-viewer-${{ matrix.name }}
           path: release/*.zip
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')

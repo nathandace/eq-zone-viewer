@@ -8,6 +8,7 @@ export function initGamepad(ctx: ViewerCtx): void {
   const held = new Set<string>();
   const pressed = new Set<number>();
   let announced = false;
+  let active = false; // some drivers report phantom pads with stuck axes: wait for a real button press
 
   function hold(code: string, down: boolean): void {
     if (down && !held.has(code)) held.add(code);
@@ -29,6 +30,10 @@ export function initGamepad(ctx: ViewerCtx): void {
     if (!gp) {
       if (held.size) for (const k of [...held]) hold(k, false);
       return;
+    }
+    if (!active) {
+      if (!gp.buttons.some((b) => b.pressed)) return;
+      active = true;
     }
     if (!announced) {
       announced = true;

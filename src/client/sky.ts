@@ -1,12 +1,14 @@
-// Sky dome and cloud layer from the client's sky.s3d, drawn around the camera behind everything else.
+// Sky dome and cloud layer from the client's sky.s3d. It lives in its own scene that is drawn first each
+// frame, so the translucent cloud layer can never be sorted in front of the zone.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { ViewerCtx } from './context.ts';
 
 export function initSky(ctx: ViewerCtx): void {
-  const { $, scene, camera } = ctx;
+  const { $, scene, camera, renderer } = ctx;
   const opt = $<HTMLInputElement>('opt-sky');
   const ambient = $<HTMLInputElement>('opt-ambient');
+  const skyScene = new THREE.Scene();
   let group: THREE.Group | null = null;
   let radius = 1;
   let cloudMaps: THREE.Texture[] = [];
@@ -22,13 +24,12 @@ export function initSky(ctx: ViewerCtx): void {
       const loader = new GLTFLoader().setResourcePath('/api/zone/sky/'); // textures come from the zone texture route
       const gltf = await loader.loadAsync('/api/sky/scene.glb');
       const sphere = new THREE.Box3().setFromObject(gltf.scene).getBoundingSphere(new THREE.Sphere());
-      radius = Math.max(1, sphere.radius);
+      radius = Math.max(1e-6, sphere.radius);
       gltf.scene.traverse((o) => {
         const m = o as THREE.Mesh;
         if (!m.isMesh) return;
         m.frustumCulled = false;
-        m.renderOrder = -10;
-        m.raycast = () => undefined;
+        m.renderOrder = m.name === 'clouds' || m.parent?.name === 'clouds' ? 1 : 0;
         const mats = (Array.isArray(m.material) ? m.material : [m.material]) as THREE.MeshBasicMaterial[];
         for (const mat of mats) {
           mat.fog = false;
@@ -36,7 +37,7 @@ export function initSky(ctx: ViewerCtx): void {
           mat.depthTest = false;
           mat.side = THREE.DoubleSide;
           materials.push(mat);
-          if (m.name === 'clouds' || m.parent?.name === 'clouds') {
+          if (m.renderOrder === 1) {
             mat.transparent = true;
             if (mat.map) {
               mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping;
@@ -47,9 +48,8 @@ export function initSky(ctx: ViewerCtx): void {
       });
       group = gltf.scene;
       group.name = 'sky';
-      group.userData.eqKind = 'sky';
-      scene.add(group);
-      console.log(`[sky] loaded (${materials.length} materials, radius ${radius.toFixed(0)})`);
+      skyScene.add(group);
+      console.log(`[sky] loaded (${materials.length} materials)`);
     } catch (e) {
       console.warn('[sky] not available', e);
     } finally {
@@ -61,15 +61,18 @@ export function initSky(ctx: ViewerCtx): void {
     if (opt.checked) void load();
   });
   ctx.events.on('frame', (dt) => {
-    if (!group) return;
-    group.visible = opt.checked && !!ctx.zoneRoot();
-    if (!group.visible) return;
+    if (!group || !opt.checked || !ctx.zoneRoot() || ctx.underwater()) return;
     group.position.copy(camera.position);
     group.scale.setScalar((camera.far * 0.85) / radius);
     const night = 1 - Number(ambient.value) / 100;
     const c = dayColor.clone().lerp(nightColor, night * 0.9);
     for (const mat of materials) mat.color.copy(c);
     for (const map of cloudMaps) map.offset.x = (map.offset.x + dt * 0.004) % 1;
+    // Draw the sky first; the main render then paints the zone over it without clearing.
+    skyScene.background = scene.background;
+    renderer.autoClear = true;
+    renderer.render(skyScene, camera);
+    renderer.autoClear = false;
   });
   opt.addEventListener('change', () => {
     if (opt.checked) void load();

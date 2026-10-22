@@ -10,6 +10,7 @@ import { initLights } from './lights.ts';
 import { initSky } from './sky.ts';
 import { initPicker } from './picker.ts';
 import { initGamepad } from './gamepad.ts';
+import { initHousekeeping } from './housekeeping.ts';
 import { EXPANSION_ORDER, expansionOf } from './expansions.ts';
 
 // Fast raycasts against zone geometry (walk mode, "Go to /loc").
@@ -40,6 +41,7 @@ const SKY = new THREE.Color(0x8fb4d9);
 scene.background = SKY;
 const camera = new THREE.PerspectiveCamera(70, 1, 1, 30000);
 camera.layers.enable(1); // layer 1: screen-space labels (map labels), left out of top-down renders
+camera.layers.enable(2); // layer 2: the sky dome, likewise
 const events = new Emitter();
 const hemi = new THREE.HemisphereLight(0xdfe9ff, 0x6b5a3a, 1.1);
 const sun = new THREE.DirectionalLight(0xffffff, 1.4);
@@ -1065,6 +1067,7 @@ function tick(): void {
   if (zoneRoot) updateUnderwater();
   events.emit('frame', dt);
   renderer.render(scene, camera);
+  renderer.autoClear = true; // a frame handler (the sky) may have drawn first and turned clearing off
   fpsAcc += dt;
   fpsFrames++;
   if (fpsAcc >= 0.5) {
@@ -1229,6 +1232,7 @@ const ctx: ViewerCtx = {
   loadZone: loadZoneByName,
   walking: () => walk.enabled,
   swimming: () => walk.swimming,
+  underwater: () => underwater,
   setWalkMode,
   returnToStart,
   holdKey: (code, down) => {
@@ -1270,6 +1274,7 @@ fetchConfig()
   .then(async (cfg) => {
     showFolder(cfg);
     $('version').textContent = cfg.version ? `v${cfg.version}` : '';
+    initHousekeeping(ctx, cfg.version || '');
     if (cfg.ok) {
       await loadZoneList();
       bootFromHash();

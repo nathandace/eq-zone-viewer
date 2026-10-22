@@ -781,3 +781,30 @@ details summary {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- cache button, update notice ---------- */
+#btn-cache {
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+#btn-cache:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+#btn-cache.armed {
+  border-color: #c0392b;
+  color: #ff8a7a;
+}
+
+#update {
+  color: #7fd17f;
+  font-weight: 600;
+}

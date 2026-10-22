@@ -61,6 +61,8 @@ export interface ViewerCtx {
   loadZone(name: string): Promise<boolean>;
   walking(): boolean;
   swimming(): boolean;
+  /** True while the camera is below a water surface (flying or swimming). */
+  underwater(): boolean;
   setWalkMode(on: boolean): void;
   returnToStart(): void;
   /** Press or release a movement key on behalf of another input device (gamepad). */
