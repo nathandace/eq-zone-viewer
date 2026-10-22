@@ -1,6 +1,12 @@
 // Browser viewer: zone list, GLB loading, free-fly camera.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+
+// Fast raycasts against zone geometry (walk mode, "Go to /loc").
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 interface ZoneInfo {
   name: string;
@@ -52,6 +58,7 @@ const opts = {
   wireframe: $<HTMLInputElement>('opt-wireframe'),
   cull: $<HTMLInputElement>('opt-cull'),
   vcolor: $<HTMLInputElement>('opt-vcolor'),
+  walk: $<HTMLInputElement>('opt-walk'),
   ambient: $<HTMLInputElement>('opt-ambient'),
   speed: $<HTMLInputElement>('opt-speed'),
   fov: $<HTMLInputElement>('opt-fov'),
@@ -221,6 +228,7 @@ async function loadZone(z: ZoneInfo): Promise<void> {
     applyFog();
     resetCamera();
     applyHashCamera();
+    if (walk.enabled) setWalkMode(true);
     setStatus(`${z.longName}  (${z.name})`);
     showWarnings(extras);
   } catch (e: any) {
@@ -242,6 +250,7 @@ function clearZone(): void {
   unlitMaterials = new Map();
   litMaterials = new Map();
   animated.length = 0;
+  walk.ready = false;
   zoneRoot = null;
 }
 
@@ -301,6 +310,167 @@ let pitch = 0;
 let speed = 180;
 const velocity = new THREE.Vector3();
 let pointerLocked = false;
+
+// ---------- Walk mode (gravity + collision) ----------
+const EYE_HEIGHT = 6; // EverQuest units; the camera sits at a character's eye level
+const STEP_HEIGHT = 3; // ledges lower than this are stepped over instead of blocking
+const BODY_RADIUS = 1.5;
+const GRAVITY = 60;
+const JUMP_SPEED = 20;
+const WALK_SPEED = 45;
+const walk = { enabled: false, vy: 0, grounded: false, ready: false };
+const walkRay = new THREE.Raycaster();
+walkRay.firstHitOnly = true;
+const DOWN = new THREE.Vector3(0, -1, 0);
+const UP = new THREE.Vector3(0, 1, 0);
+
+/** Water and sky surfaces, and hidden objects, do not block movement. */
+function isCollidable(obj: THREE.Object3D): boolean {
+  for (let o: THREE.Object3D | null = obj; o; o = o.parent) {
+    if (!o.visible) return false;
+    const k = o.userData?.eqKind;
+    if (k === 'water' || k === 'sky') return false;
+  }
+  return true;
+}
+
+/** Build BVH trees for every geometry in the zone the first time walk mode needs them. */
+function prepareCollision(): void {
+  if (!zoneRoot || walk.ready) return;
+  const t0 = performance.now();
+  const seen = new Set<THREE.BufferGeometry>();
+  zoneRoot.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || seen.has(m.geometry)) return;
+    seen.add(m.geometry);
+    if (!m.geometry.boundsTree) m.geometry.computeBoundsTree();
+  });
+  walk.ready = true;
+  console.log(`[walk] collision ready: ${seen.size} geometries in ${(performance.now() - t0).toFixed(0)}ms`);
+}
+
+/** Nearest collidable surface along a ray within `far` units, or null. */
+function castRay(origin: THREE.Vector3, dir: THREE.Vector3, far: number): THREE.Intersection | null {
+  if (!zoneRoot) return null;
+  walkRay.set(origin, dir);
+  walkRay.near = 0;
+  walkRay.far = far;
+  for (const hit of walkRay.intersectObject(zoneRoot, true)) if (isCollidable(hit.object)) return hit;
+  return null;
+}
+
+/** World-space surface normal of a hit, facing against the ray. */
+function hitNormal(hit: THREE.Intersection, dir: THREE.Vector3): THREE.Vector3 {
+  const n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : dir.clone().negate();
+  if (n.dot(dir) > 0) n.negate();
+  return n;
+}
+
+/** Lowest collidable surface under a point (so a forest canopy or a bridge is not mistaken for the ground). */
+function groundBelow(x: number, y: number, z: number): THREE.Intersection | null {
+  if (!zoneRoot) return null;
+  walkRay.firstHitOnly = false;
+  walkRay.set(new THREE.Vector3(x, y, z), DOWN);
+  walkRay.near = 0;
+  walkRay.far = 1e6;
+  let lowest: THREE.Intersection | null = null;
+  for (const hit of walkRay.intersectObject(zoneRoot, true)) {
+    if (isCollidable(hit.object) && (!lowest || hit.distance > lowest.distance)) lowest = hit;
+  }
+  walkRay.firstHitOnly = true;
+  return lowest;
+}
+
+/** Put the camera at eye height on the ground (walk mode switch-on, zone load, respawn). */
+function settleOnGround(): void {
+  const p = camera.position;
+  let hit = castRay(new THREE.Vector3(p.x, p.y + STEP_HEIGHT, p.z), DOWN, 1e6);
+  if (!hit && zoneBounds) {
+    // Nothing under the camera: the start view usually floats outside the map, so drop in at the point it looks at.
+    const t = start ? start.target : [(zoneBounds.min[0] + zoneBounds.max[0]) / 2, 0, (zoneBounds.min[2] + zoneBounds.max[2]) / 2];
+    hit = groundBelow(t[0], zoneBounds.max[1] + 10, t[2]);
+    if (hit) {
+      p.x = t[0];
+      p.z = t[2];
+    }
+  }
+  if (hit) p.y = hit.point.y + EYE_HEIGHT;
+  walk.vy = 0;
+  walk.grounded = !!hit;
+}
+
+function setWalkMode(on: boolean): void {
+  walk.enabled = on;
+  opts.walk.checked = on;
+  if (on && zoneRoot) {
+    prepareCollision();
+    settleOnGround();
+    // Look at the horizon rather than straight down at the map.
+    pitch = Math.max(pitch, -0.1);
+    updateCameraRotation();
+  }
+}
+
+/** One frame of character-style movement: walls block and slide, small ledges are stepped over, gravity and jumping apply. */
+function walkStep(dt: number): void {
+  const p = camera.position;
+  const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  const move = new THREE.Vector3();
+  if (keys.has('KeyW') || keys.has('ArrowUp')) move.add(forward);
+  if (keys.has('KeyS') || keys.has('ArrowDown')) move.sub(forward);
+  if (keys.has('KeyD') || keys.has('ArrowRight')) move.add(right);
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) move.sub(right);
+  if (move.lengthSq() > 0) {
+    let s = WALK_SPEED;
+    if (keys.has('ShiftLeft') || keys.has('ShiftRight')) s *= 2;
+    if (keys.has('ControlLeft') || keys.has('ControlRight')) s *= 0.4;
+    move.normalize().multiplyScalar(s * dt);
+    // Walls: probe at knee and eye height; slide along whatever is hit (twice, for corners).
+    for (let i = 0; i < 2 && move.lengthSq() > 1e-8; i++) {
+      const dir = move.clone().normalize();
+      const reach = move.length() + BODY_RADIUS;
+      const knee = new THREE.Vector3(p.x, p.y - EYE_HEIGHT + STEP_HEIGHT, p.z);
+      const hit = castRay(knee, dir, reach) ?? castRay(p, dir, reach);
+      if (!hit) break;
+      const n = hitNormal(hit, dir);
+      n.y = 0;
+      if (n.lengthSq() < 1e-6) break;
+      n.normalize();
+      move.sub(n.multiplyScalar(move.dot(n)));
+    }
+    p.add(move);
+  }
+  // Vertical: jump, gravity, head bumps, landing.
+  if ((keys.has('Space') || keys.has('KeyE')) && walk.grounded) {
+    walk.vy = JUMP_SPEED;
+    walk.grounded = false;
+  }
+  walk.vy = Math.max(walk.vy - GRAVITY * dt, -400);
+  const dy = walk.vy * dt;
+  const knee = new THREE.Vector3(p.x, p.y - EYE_HEIGHT + STEP_HEIGHT, p.z);
+  if (dy < 0) {
+    // Look down from knee height so steps and slopes under STEP_HEIGHT are climbed and we never tunnel through a floor.
+    const ground = castRay(knee, DOWN, STEP_HEIGHT - dy + (walk.grounded ? 1.5 : 0.1));
+    if (ground) {
+      p.y = ground.point.y + EYE_HEIGHT;
+      walk.vy = 0;
+      walk.grounded = true;
+    } else {
+      p.y += dy;
+      walk.grounded = false;
+    }
+  } else {
+    if (castRay(p, UP, dy + 1)) walk.vy = 0;
+    else p.y += dy;
+    walk.grounded = false;
+  }
+  // Fell out of the world: back to the zone's start point.
+  if (p.y < (zoneBounds ? zoneBounds.min[1] - 500 : -10000)) {
+    resetCamera();
+    settleOnGround();
+  }
+}
 
 function resetCamera(): void {
   if (start) {
@@ -365,6 +535,7 @@ function applyHashCamera(): void {
     opts.lit.checked = true;
     applyMaterialOptions();
   }
+  if (params.get('walk') === '1') setWalkMode(true);
   if (params.get('fog') === '0') {
     opts.fog.checked = false;
     applyFog();
@@ -427,6 +598,7 @@ window.addEventListener('keydown', (e) => {
   keys.add(e.code);
   if (e.code === 'KeyR') resetCamera();
   if (e.code === 'KeyT') topView();
+  if (e.code === 'KeyG') setWalkMode(!walk.enabled);
   if (e.code === 'KeyO') {
     opts.objects.checked = !opts.objects.checked;
     applyVisibility();
@@ -448,6 +620,7 @@ opts.wireframe.addEventListener('change', applyMaterialOptions);
 opts.cull.addEventListener('change', applyMaterialOptions);
 opts.vcolor.addEventListener('change', applyMaterialOptions);
 opts.fog.addEventListener('change', applyFog);
+opts.walk.addEventListener('change', () => setWalkMode(opts.walk.checked));
 opts.ambient.addEventListener('input', () => {
   const v = Number(opts.ambient.value) / 100;
   eqUniforms.eqAmbient.value = v;
@@ -493,6 +666,7 @@ function tick(): void {
   const dt = Math.min(clock.getDelta(), 0.1);
   resize();
   // movement
+  if (walk.enabled && zoneRoot) walkStep(dt);
   const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
   const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   velocity.set(0, 0, 0);
@@ -507,7 +681,7 @@ function tick(): void {
     if (keys.has('ShiftLeft') || keys.has('ShiftRight')) s *= 4;
     if (keys.has('ControlLeft') || keys.has('ControlRight')) s *= 0.25;
     velocity.normalize().multiplyScalar(s * dt);
-    camera.position.add(velocity);
+    if (!walk.enabled || !zoneRoot) camera.position.add(velocity);
   }
   // texture animation
   for (const a of animated) {

@@ -86,6 +86,7 @@ Click the 3D view to capture the mouse; **Esc** releases it.
 | **R** | Reset the camera to the zone's start point |
 | **T** | Top-down view of the whole zone |
 | **O** | Toggle placed objects (trees, rocks, furniture) |
+| **G** | Toggle walk mode (see below); **Space** jumps while walking |
 
 The **Settings** panel has:
 
@@ -95,6 +96,10 @@ The **Settings** panel has:
 - **Wireframe** and **Backface culling**: handy for finding geometry problems.
 - **Vertex lighting**: EverQuest bakes torches, lamps and shadows into vertex colors; turn this off to see
   the raw textures.
+- **Walk mode**: off by default, so the camera flies freely through everything. Turn it on to explore
+  on foot like a character: gravity pulls you to the ground, walls and objects block you, small steps and
+  slopes are climbed, and Space jumps. Shift sprints, Ctrl walks slowly. Water does not block you, and
+  falling out of the world puts you back at the zone's start point.
 - **Daylight**: ambient light level. Lower it in a classic zone to see the baked-in lamps and torches.
 - **Speed** and **FOV** sliders.
 - **Go to /loc**: paste the numbers from the in-game `/loc` command (`Y, X` and optionally `Z`) and press
@@ -117,6 +122,7 @@ Everything after `#` in the address bar restores a view, so links can be shared 
 | `view=top` | Top-down view |
 | `amb=0..1` | Daylight slider |
 | `objects=0`, `lit=1`, `fog=0` | Toggle objects, shaded lighting and fog |
+| `walk=1` | Start in walk mode |
 | `setup=1` | Open the folder chooser |
 
 Example: `http://localhost:3080/#zone=gfaydark&loc=-1200,500` drops you on the ground in Greater Faydark.
@@ -134,8 +140,8 @@ Example: `http://localhost:3080/#zone=gfaydark&loc=-1200,500` drops you on the g
 
 Every zone archive in a current Live install (612 zones) and in a progression-era install (198 zones)
 builds and renders; a few dozen of them report textures that could not be found, which show up in the
-warnings box. Not supported (yet): character and NPC models, dynamic lights, particles, sounds, zone lines
-and collision. If a zone fails to build or looks
+warnings box. Not supported (yet): character and NPC models, dynamic lights, particles, sounds and zone
+lines. If a zone fails to build or looks
 wrong, please [open an issue](https://github.com/nathandace/eq-zone-viewer/issues) with the zone name,
 which client you have, and the error shown in the viewer.
 
