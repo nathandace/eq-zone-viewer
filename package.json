@@ -1,6 +1,6 @@
 {
   "name": "eq-zone-viewer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browse EverQuest zones in 3D, read straight from your own game install",
   "private": true,
   "license": "MIT",
