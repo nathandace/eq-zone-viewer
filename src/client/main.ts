@@ -6,6 +6,8 @@ import { Emitter, type ViewerCtx } from './context.ts';
 import { initMaps } from './maps.ts';
 import { initMinimap } from './minimap.ts';
 import { initBookmarks } from './bookmarks.ts';
+import { initLights } from './lights.ts';
+import { initSky } from './sky.ts';
 
 // Fast raycasts against zone geometry (walk mode, "Go to /loc").
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
@@ -55,6 +57,9 @@ let zoneBounds: { min: number[]; max: number[] } | null = null;
 const animated: { material: THREE.Material & { map: THREE.Texture | null }; frames: THREE.Texture[]; delay: number; t: number; i: number }[] = [];
 let unlitMaterials = new Map<THREE.Material, THREE.Material>();
 let litMaterials = new Map<THREE.Material, THREE.Material>();
+let waterMeshes: THREE.Object3D[] = []; // water surfaces of the current zone (collision trees built at load)
+const UNDERWATER = new THREE.Color(0x163c52);
+let underwater = false;
 
 // ---------- UI ----------
 const opts = {
@@ -67,6 +72,7 @@ const opts = {
   walk: $<HTMLInputElement>('opt-walk'),
   maplines: $<HTMLInputElement>('opt-maplines'),
   maplabels: $<HTMLInputElement>('opt-maplabels'),
+  sky: $<HTMLInputElement>('opt-sky'),
   ambient: $<HTMLInputElement>('opt-ambient'),
   speed: $<HTMLInputElement>('opt-speed'),
   fov: $<HTMLInputElement>('opt-fov'),
@@ -301,7 +307,7 @@ function kindOf(o: THREE.Object3D | null): string | undefined {
 }
 
 // ---------- Remembered settings ----------
-const PREF_KEYS = ['objects', 'lit', 'fog', 'wireframe', 'cull', 'vcolor', 'ambient', 'fov', 'maplines', 'maplabels'] as const;
+const PREF_KEYS = ['objects', 'lit', 'fog', 'wireframe', 'cull', 'vcolor', 'ambient', 'fov', 'maplines', 'maplabels', 'sky'] as const;
 function savePrefs(): void {
   try {
     const out: Record<string, string | boolean> = {};
@@ -352,6 +358,7 @@ function clearZone(): void {
   for (const [, m] of litMaterials) m.dispose();
   unlitMaterials = new Map();
   litMaterials = new Map();
+  waterMeshes = [];
   animated.length = 0;
   walk.ready = false;
   zoneRoot = null;
@@ -365,12 +372,25 @@ function setupMaterials(gltf: any): void {
     const mesh = obj as THREE.Mesh;
     if (!mesh.isMesh) return;
     mesh.frustumCulled = true;
+    const water = kindOf(mesh) === 'water';
+    if (water) {
+      // Water shares materials with the land in classic zones: give it its own translucent copies.
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map((m) => m.clone()) : mesh.material.clone();
+      mesh.geometry.computeBoundsTree();
+      waterMeshes.push(mesh);
+    }
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     for (const m of mats) {
       if (seen.has(m)) continue;
       seen.add(m);
       const mb = m as THREE.MeshBasicMaterial;
       const extras = (mb.userData || {}) as any;
+      if (water) {
+        mb.transparent = true;
+        mb.opacity = Math.min(mb.opacity, 0.72);
+        mb.depthWrite = false;
+        mb.color.multiply(new THREE.Color(0.8, 0.9, 1.0));
+      }
       if (extras.eqMode === 'additive') {
         mb.blending = THREE.AdditiveBlending;
         mb.transparent = true;
@@ -444,7 +464,7 @@ function isWater(obj: THREE.Object3D): boolean {
 
 /** Height of the water surface directly above a point, or null when the point is not under water. */
 function waterSurfaceAbove(p: THREE.Vector3): number | null {
-  if (!zoneRoot || !zoneBounds) return null;
+  if (!zoneRoot || !zoneBounds || !waterMeshes.length) return null;
   const top = zoneBounds.max[1] + 10;
   if (p.y >= top) return null;
   walkRay.firstHitOnly = false;
@@ -452,12 +472,26 @@ function waterSurfaceAbove(p: THREE.Vector3): number | null {
   walkRay.near = 0;
   walkRay.far = top - p.y;
   let surface: number | null = null;
-  for (const hit of walkRay.intersectObject(zoneRoot, true)) {
+  for (const hit of walkRay.intersectObjects(waterMeshes, false)) {
     if (hit.point.y <= p.y || !isWater(hit.object)) continue;
     if (surface === null || hit.point.y < surface) surface = hit.point.y;
   }
   walkRay.firstHitOnly = true;
   return surface;
+}
+
+/** Blue-green fog and backdrop while the camera is below a water surface (flying or swimming). */
+function updateUnderwater(): void {
+  const now = waterSurfaceAbove(camera.position) !== null;
+  if (now === underwater) return;
+  underwater = now;
+  if (now) {
+    scene.fog = new THREE.Fog(UNDERWATER, 2, 260);
+    scene.background = UNDERWATER.clone();
+  } else {
+    applyFog();
+    opts.ambient.dispatchEvent(new Event('input')); // restores the sky colour for the current daylight
+  }
 }
 
 /** Build BVH trees for every geometry in the zone the first time walk mode needs them. */
@@ -936,6 +970,7 @@ function tick(): void {
       a.material.needsUpdate = false;
     }
   }
+  if (zoneRoot) updateUnderwater();
   events.emit('frame', dt);
   renderer.render(scene, camera);
   fpsAcc += dt;
@@ -1110,6 +1145,8 @@ const ctx: ViewerCtx = {
 initMaps(ctx);
 initMinimap(ctx);
 initBookmarks(ctx);
+initLights(ctx);
+initSky(ctx);
 
 /** Small scripting surface for the console and for tools/shot.ts. */
 (window as any).eqViewer = {

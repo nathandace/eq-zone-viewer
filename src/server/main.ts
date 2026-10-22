@@ -11,10 +11,12 @@ import { discoverZones, type ZoneInfo } from './zones.ts';
 import type { BuildFailure, BuildRequest, BuildResult } from './build-worker.ts';
 import { decodeTexture, encodePng, downsample } from './textures.ts';
 import { loadZoneMap } from './maps.ts';
+import { buildSkyScene } from './build-s3d.ts';
+import { buildGlb } from './gltf.ts';
 import { APP_DIR, CONFIG_PATH, candidateEqDirs, loadConfig, looksLikeEqDir, saveEqDir } from './config.ts';
 
 /** Bump when the parsers or the GLB layout change so cached zone builds are discarded. */
-const BUILD_VERSION = 2;
+const BUILD_VERSION = 3;
 const PUBLIC_DIR = join(APP_DIR, 'public');
 const CACHE_ROOT = join(APP_DIR, 'cache', `v${BUILD_VERSION}`);
 const MAX_TEXTURE_SIZE = 2048;
@@ -259,6 +261,21 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     } catch (e: any) {
       console.error(`[build] ${name} failed:`, e);
       sendJson(res, 500, { error: `build failed: ${e.message}`, stack: String(e.stack || '').split('\n').slice(0, 6) });
+    }
+    return;
+  }
+  if (path === '/api/sky/scene.glb') {
+    if (!config.eqDir) {
+      sendJson(res, 404, { error: 'no EverQuest directory' });
+      return;
+    }
+    const skyPath = join(cacheDir, 'sky.glb');
+    try {
+      if (!existsSync(skyPath)) writeFileSync(skyPath, buildGlb(buildSkyScene(config.eqDir)));
+      send(res, 200, readFileSync(skyPath), 'model/gltf-binary');
+    } catch (e: any) {
+      console.error('[sky] failed:', e.message);
+      sendJson(res, 500, { error: `sky build failed: ${e.message}` });
     }
     return;
   }

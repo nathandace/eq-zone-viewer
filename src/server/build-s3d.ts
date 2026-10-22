@@ -14,6 +14,7 @@ import {
   transformPoint,
   type Instance,
   type MeshNode,
+  type SceneLight,
   type SceneMaterial,
   type SceneMesh,
   type TextureRef,
@@ -65,7 +66,7 @@ export class S3dBuilder {
     if (this.warnings.length < 500) this.warnings.push(s);
   }
 
-  private openContext(archive: PfsArchive, archiveFile: string, wldName: string): WldContext | undefined {
+  openContext(archive: PfsArchive, archiveFile: string, wldName: string): WldContext | undefined {
     const buf = archive.get(wldName);
     if (!buf) return undefined;
     const ctx: WldContext = {
@@ -128,7 +129,7 @@ export class S3dBuilder {
   }
 
   /** Append a 0x36 mesh (optionally pre-transformed in EQ space) to a merger. */
-  private appendMesh(ctx: WldContext, meshFrag: Frag, merger: MeshMerger, transform?: (p: Vec3) => Vec3, boneTransforms?: Transform[], liquidMerger?: MeshMerger): void {
+  appendMesh(ctx: WldContext, meshFrag: Frag, merger: MeshMerger, transform?: (p: Vec3) => Vec3, boneTransforms?: Transform[], liquidMerger?: MeshMerger): void {
     const { wld } = ctx;
     const m = wld.mesh(meshFrag);
     const listFrag = wld.frag(m.materialListRef);
@@ -427,10 +428,30 @@ export class S3dBuilder {
     }
     for (const [name, count] of missingActors) this.warn(`missing object model ${name} (${count} placements)`);
 
+    // Placed lights live in lights.wld inside the zone archive (0x28 placements -> 0x1C refs -> 0x1B definitions).
+    const lights: SceneLight[] = [];
+    const lightCtx = this.openContext(main, mainFile, 'lights.wld');
+    if (lightCtx) {
+      for (const f of lightCtx.wld.byType(0x28)) {
+        const pl = lightCtx.wld.pointLight(f);
+        let color: Vec3 = [1, 1, 1];
+        const ref = lightCtx.wld.frag(pl.lightRef);
+        if (ref?.type === 0x1c) {
+          const def = lightCtx.wld.frag(lightCtx.wld.lightRef(ref));
+          if (def?.type === 0x1b) {
+            const d = lightCtx.wld.lightDef(def);
+            color = [d.color[0] * d.level, d.color[1] * d.level, d.color[2] * d.level];
+          }
+        }
+        lights.push({ position: eqToGl(pl.position[0], pl.position[1], pl.position[2]), color, radius: pl.radius });
+      }
+    }
+
     const center = bounds.valid ? bounds.center : ([0, 0, 0] as Vec3);
     const size = bounds.valid ? bounds.size : ([100, 100, 100] as Vec3);
     const extent = Math.max(size[0], size[2]);
     return {
+      lights,
       name: zone,
       materials: this.materials.list,
       meshes: this.meshes,
@@ -444,6 +465,7 @@ export class S3dBuilder {
         objects: instanceCount,
         objectTypes: instancesByActor.size,
         missingObjectTypes: missingActors.size,
+        lights: lights.length,
         triangles,
       },
       start: {
@@ -456,4 +478,41 @@ export class S3dBuilder {
 
 export function buildS3dZone(eqDir: string, zone: string): ZoneScene {
   return new S3dBuilder(eqDir, zone).build();
+}
+
+/**
+ * The default sky from sky.s3d: dome layer 1 and its cloud layer. The file holds fifteen sky variants
+ * (LAYER<n>1 dome, LAYER<n>3 clouds) but which one a zone uses is server-side data, so the viewer shows
+ * the standard blue sky everywhere.
+ */
+export function buildSkyScene(eqDir: string, variant = 1): ZoneScene {
+  const b = new S3dBuilder(eqDir, 'sky');
+  const file = 'sky.s3d';
+  const archive = PfsArchive.open(join(eqDir, file));
+  const ctx = b.openContext(archive, file, 'sky.wld');
+  if (!ctx) throw new Error('sky.s3d has no sky.wld');
+  const bounds = new Bounds();
+  for (const [suffix, name] of [
+    ['1', 'skydome'],
+    ['3', 'clouds'],
+  ] as const) {
+    const frag = ctx.wld.byType(0x36).find((f) => f.name === `LAYER${variant}${suffix}_DMSPRITEDEF`);
+    if (!frag) continue;
+    const merger = new MeshMerger(name);
+    b.appendMesh(ctx, frag, merger);
+    if (merger.isEmpty) continue;
+    const mesh = merger.build();
+    bounds.addPositions(mesh.positions);
+    b.meshes.push(mesh);
+    b.nodes.push({ name, kind: 'sky', mesh: b.meshes.length - 1, instances: [{ position: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] }] });
+  }
+  return {
+    name: 'sky',
+    materials: b.materials.list,
+    meshes: b.meshes,
+    nodes: b.nodes,
+    bounds: { min: bounds.min, max: bounds.max },
+    warnings: b.warnings,
+    stats: { format: 'sky.s3d', meshes: b.meshes.length },
+  };
 }

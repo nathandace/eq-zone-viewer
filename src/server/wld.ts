@@ -110,6 +110,13 @@ export interface PointLight {
   radius: number;
 }
 
+/** 0x1B light definition: colour (and brightness) per animation frame; most zone lights have one frame. */
+export interface LightDef {
+  flags: number;
+  color: [number, number, number];
+  level: number;
+}
+
 export class Wld {
   readonly version: number;
   readonly isNew: boolean;
@@ -500,6 +507,35 @@ export class Wld {
 
   vertexColorsRef(f: Frag): number {
     return this.cached(f, (r) => r.i32());
+  }
+
+  /** 0x1C light reference: the 0x1B definition it points at. */
+  lightRef(f: Frag): number {
+    return this.cached(f, (r) => r.i32());
+  }
+
+  lightDef(f: Frag): LightDef {
+    return this.cached(f, (r) => {
+      const flags = r.i32();
+      const frameCount = r.i32();
+      if (flags & 0x01) r.i32(); // current frame
+      if (flags & 0x02) r.i32(); // sleep (ms)
+      let level = 1;
+      if (flags & 0x04) {
+        for (let i = 0; i < frameCount; i++) {
+          const v = r.f32();
+          if (i === 0) level = v;
+        }
+      }
+      let color: [number, number, number] = [1, 1, 1];
+      if (flags & 0x10) {
+        for (let i = 0; i < frameCount; i++) {
+          const c: [number, number, number] = [r.f32(), r.f32(), r.f32()];
+          if (i === 0) color = c;
+        }
+      }
+      return { flags, color, level };
+    });
   }
 
   pointLight(f: Frag): PointLight {

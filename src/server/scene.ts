@@ -54,6 +54,13 @@ export interface MeshNode {
   instances: Instance[];
 }
 
+/** A placed point light (torch, lamp, glowing crystal), in viewer space. */
+export interface SceneLight {
+  position: Vec3;
+  color: Vec3;
+  radius: number;
+}
+
 export interface ZoneScene {
   name: string;
   materials: SceneMaterial[];
@@ -64,6 +71,7 @@ export interface ZoneScene {
   stats: Record<string, number | string>;
   start?: { position: Vec3; target: Vec3 };
   sky?: Vec3; // background / fog colour override (0..1)
+  lights?: SceneLight[];
 }
 
 export const IDENTITY_QUAT: Quat = [0, 0, 0, 1];

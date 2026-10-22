@@ -92,7 +92,9 @@ the menu is always one click away.
 The **Settings** panel has:
 
 - **Objects**: show or hide placed objects.
-- **Shaded lighting**: a simple directional light instead of the flat, in-game look.
+- **Shaded lighting**: a directional sun plus the zone's own placed lights (torches, lamps, braziers from
+  the zone files; the nearest eight follow you around). Turn Daylight down to see them at night.
+- **Sky dome**: the standard sky and drifting clouds from the game's `sky.s3d`, darkening with Daylight.
 - **Fog**: distance fog sized to the zone.
 - **Wireframe** and **Backface culling**: handy for finding geometry problems.
 - **Vertex lighting**: EverQuest bakes torches, lamps and shadows into vertex colors; turn this off to see
@@ -102,7 +104,7 @@ The **Settings** panel has:
   pulls you to the ground, walls and objects block you, small steps and slopes are climbed, and Space
   jumps. Shift sprints, Ctrl walks slowly. Under water you swim: you move in the direction you look,
   E or Space swims up, Q or C dives, nothing pulls you down, and walking up the bank brings you back
-  out. Falling out of the world puts you back at the zone's start point, and picking another zone
+  out. Water surfaces are translucent, and the view turns blue-green whenever the camera is below one. Falling out of the world puts you back at the zone's start point, and picking another zone
   switches walk mode off again.
 - **Return to start** (button at the top of the view, or **R**): back to the zone's start point, on the
   ground when walking.

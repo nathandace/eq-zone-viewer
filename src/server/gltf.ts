@@ -85,6 +85,7 @@ export function buildGlb(scene: ZoneScene): Buffer {
       bounds: scene.bounds,
       start: scene.start,
       sky: scene.sky,
+      lights: scene.lights,
       stats: scene.stats,
       warnings: scene.warnings.slice(0, 200),
     },
