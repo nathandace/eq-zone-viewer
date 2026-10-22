@@ -41,7 +41,7 @@
       </details>
       <details id="help">
         <summary>Controls</summary>
-        <p>Click the view to capture the mouse, <b>Esc</b> to release.<br />
+        <p>Drag in the view (left or right button) to look around.<br />
           <b>W A S D</b> move · <b>Q / C</b> down · <b>E / Space</b> up<br />
           <b>Shift</b> fast · <b>Ctrl</b> slow · <b>Mouse wheel</b> speed<br />
           <b>R</b> reset camera · <b>O</b> toggle objects · <b>T</b> top view<br />
@@ -50,7 +50,7 @@
     </footer>
   </aside>
   <main id="view">
-    <canvas id="canvas"></canvas>
+    <canvas id="canvas" tabindex="-1"></canvas>
     <div id="hud">
       <div id="status">Select a zone</div>
       <div id="stats" class="muted"></div>
@@ -60,7 +60,7 @@
       <button id="btn-start" type="button" title="Back to the zone's start point (R)">Return to start</button>
     </div>
     <div id="warnings" class="hidden"></div>
-    <div id="hint" class="hidden">Click to look around</div>
+    <div id="hint" class="hidden">Drag to look around · W A S D to move · scroll wheel for speed</div>
     <div id="setup" class="hidden">
       <div class="panel">
         <h2>Where is EverQuest installed?</h2>

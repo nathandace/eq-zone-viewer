@@ -28,8 +28,9 @@ body {
 }
 
 #sidebar {
-  width: 300px;
-  flex: 0 0 300px;
+  width: 340px;
+  flex: 0 0 340px;
+  font-size: 15px;
   background: var(--panel);
   border-right: 1px solid var(--border);
   display: flex;
@@ -44,7 +45,7 @@ body {
 
 #sidebar h1 {
   margin: 0 0 8px;
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 600;
   color: var(--accent2);
   letter-spacing: 0.02em;
@@ -53,6 +54,7 @@ body {
 #filter {
   width: 100%;
   padding: 7px 9px;
+  font-size: 15px;
   border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--panel2);
@@ -66,7 +68,7 @@ body {
 
 #zone-count {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 #zone-list {
@@ -79,7 +81,7 @@ body {
 }
 
 #zone-list li {
-  padding: 6px 12px;
+  padding: 7px 12px;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
@@ -98,7 +100,7 @@ body {
 
 #zone-list li .short {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-family: ui-monospace, Consolas, monospace;
 }
 
@@ -107,7 +109,7 @@ body {
 }
 
 #zone-list li .kind {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   border: 1px solid var(--border);
   border-radius: 3px;
@@ -118,7 +120,7 @@ body {
 #sidebar footer {
   border-top: 1px solid var(--border);
   padding: 8px 12px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 details summary {
@@ -148,7 +150,7 @@ details summary {
   border: 1px solid var(--border);
   background: var(--panel2);
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
   min-width: 0;
 }
 
@@ -169,7 +171,7 @@ details summary {
   color: var(--text);
   text-decoration: none;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 #settings button:hover,
@@ -197,6 +199,11 @@ details summary {
   height: 100%;
   display: block;
   outline: none;
+  cursor: grab;
+}
+
+#canvas.dragging {
+  cursor: grabbing;
 }
 
 #hud {
@@ -263,7 +270,7 @@ details summary {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 12px;
   padding-bottom: 6px;
   margin-bottom: 4px;
   border-bottom: 1px solid var(--border);

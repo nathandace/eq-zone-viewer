@@ -74,7 +74,8 @@ Other settings:
 
 ## Using the viewer
 
-Click the 3D view to capture the mouse; **Esc** releases it.
+Drag in the 3D view with the left or right mouse button to look around. The cursor is never captured, so
+the menu is always one click away.
 
 | Keys | Action |
 | --- | --- |

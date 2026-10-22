@@ -231,6 +231,7 @@ async function loadZone(z: ZoneInfo): Promise<void> {
     applyHashCamera();
     setStatus(`${z.longName}  (${z.name})`);
     showWarnings(extras);
+    hintEl.classList.remove('hidden');
   } catch (e: any) {
     console.error(e);
     setStatus(`Failed to load ${z.name}: ${e.message}`);
@@ -309,8 +310,6 @@ let yaw = 0;
 let pitch = 0;
 let speed = 180;
 const velocity = new THREE.Vector3();
-let pointerLocked = false;
-
 // ---------- Walk mode (gravity + collision) ----------
 const EYE_HEIGHT = 6; // EverQuest units; the camera sits at a character's eye level
 const STEP_HEIGHT = 3; // ledges lower than this are stepped over instead of blocking
@@ -586,19 +585,31 @@ function updateCameraRotation(): void {
   camera.quaternion.setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
 }
 
-canvas.addEventListener('click', () => {
-  if (!pointerLocked) canvas.requestPointerLock();
+// Mouse look is drag-based (left or right button) so the cursor stays free for the menu.
+let dragging = false;
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button !== 0 && e.button !== 2) return;
+  dragging = true;
+  canvas.classList.add('dragging');
+  hintEl.classList.add('hidden');
+  canvas.focus();
+  e.preventDefault();
 });
-document.addEventListener('pointerlockchange', () => {
-  pointerLocked = document.pointerLockElement === canvas;
-  hintEl.classList.toggle('hidden', pointerLocked || !zoneRoot);
+window.addEventListener('mouseup', () => {
+  dragging = false;
+  canvas.classList.remove('dragging');
 });
-document.addEventListener('mousemove', (e) => {
-  if (!pointerLocked) return;
-  yaw -= e.movementX * 0.0022;
-  pitch -= e.movementY * 0.0022;
+window.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  yaw -= e.movementX * 0.004;
+  pitch -= e.movementY * 0.004;
   pitch = THREE.MathUtils.clamp(pitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
   updateCameraRotation();
+});
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+// A clicked button keeps keyboard focus, which would make Space re-trigger it instead of jumping or flying up.
+document.addEventListener('click', (e) => {
+  if (e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement) e.target.blur();
 });
 canvas.addEventListener('wheel', (e) => {
   speed *= Math.pow(1.15, -Math.sign(e.deltaY));
@@ -618,7 +629,11 @@ window.addEventListener('keydown', (e) => {
   }
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
-window.addEventListener('blur', () => keys.clear());
+window.addEventListener('blur', () => {
+  keys.clear();
+  dragging = false;
+  canvas.classList.remove('dragging');
+});
 
 function applyVisibility(): void {
   if (!zoneRoot) return;
